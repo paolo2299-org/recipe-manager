@@ -90,14 +90,14 @@ Install Docker and the Compose plugin on the VM, then create the app and data di
 sudo install -d -o deploy -g deploy -m 0755 /srv/recipe-manager /srv/recipe-manager/app /srv/recipe-manager/data
 ```
 
-Clone this repo onto the VM so the Compose files live at `/srv/recipe-manager/app`:
+Clone this repo onto the VM under `/srv/recipe-manager/app`, so the checked-out repo lives at `/srv/recipe-manager/app/recipe-manager` and the Flask package lives at `/srv/recipe-manager/app/recipe-manager/app`:
 
 ```bash
 cd /srv/recipe-manager/app
-git clone git@github.com:YOUR_GITHUB_USER/recipe-organizer.git .
+git clone git@github.com:YOUR_GITHUB_USER/recipe-organizer.git
 ```
 
-Create a production `.env` file at `/srv/recipe-manager/app/.env` with your real secrets:
+Create a production `.env` file at `/srv/recipe-manager/app/recipe-manager/.env` with your real secrets:
 
 ```dotenv
 ANTHROPIC_API_KEY=your_real_key
@@ -129,7 +129,7 @@ recipes.example.com {
 To start or manually update the production stack from the checked-out repo on the VM:
 
 ```bash
-cd /srv/recipe-manager/app
+cd /srv/recipe-manager/app/recipe-manager
 docker compose -f compose.yml -f compose.prod.yml pull
 docker compose -f compose.yml -f compose.prod.yml up -d
 ```
@@ -157,7 +157,7 @@ Assuming the VM is already set up as described above, these are the extra steps 
 
 #### 1. Set the image name
 
-Set `IMAGE_NAME` in `/srv/recipe-manager/app/.env` so Compose pulls the correct GHCR image:
+Set `IMAGE_NAME` in `/srv/recipe-manager/app/recipe-manager/.env` so Compose pulls the correct GHCR image:
 
 ```dotenv
 IMAGE_NAME=ghcr.io/your-github-user/your-repo-name
@@ -195,7 +195,7 @@ After those secrets are in place, merges into `main` will publish a new image an
 Because the workflow deploys the image tagged with the Git commit SHA, rollback is simple: set `IMAGE_TAG` to an older commit SHA on the VM and rerun Compose.
 
 ```bash
-cd /srv/recipe-manager/app
+cd /srv/recipe-manager/app/recipe-manager
 export IMAGE_TAG=<older-commit-sha>
 docker compose -f compose.yml -f compose.prod.yml pull
 docker compose -f compose.yml -f compose.prod.yml up -d

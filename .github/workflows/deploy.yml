@@ -63,7 +63,7 @@ jobs:
           script_stop: true
           script: |
             set -eu
-            cd /srv/recipe-manager/app
+            cd /srv/recipe-manager/app/recipe-manager
 
             if [ -n "${GHCR_USERNAME}" ] && [ -n "${GHCR_TOKEN}" ]; then
               echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
