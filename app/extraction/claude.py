@@ -1,12 +1,13 @@
 """Recipe extraction using Anthropic Claude."""
 
+import json
 import logging
 
 import anthropic
 
 from .image import prepare_image
 from .jina import fetch_via_jina
-from .schema import EXTRACT_RECIPE_TOOL
+from .schema import EDIT_RECIPE_TOOL, EXTRACT_RECIPE_TOOL
 
 logger = logging.getLogger(__name__)
 
@@ -16,27 +17,34 @@ class ExtractionError(Exception):
     pass
 
 
-def _call_claude(messages: list[dict]) -> dict:
-    """Send messages to Claude with forced tool use and return the extracted recipe."""
+def _call_claude_tool(messages: list[dict], tool: dict) -> dict:
+    """Send messages to Claude with forced tool use and return the tool payload."""
+    tool_name = tool["name"]
     client = anthropic.Anthropic()
     response = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=4096,
-        tools=[EXTRACT_RECIPE_TOOL],
-        tool_choice={"type": "tool", "name": "extract_recipe"},
+        tools=[tool],
+        tool_choice={"type": "tool", "name": tool_name},
         messages=messages,
     )
 
     for block in response.content:
-        if block.type == "tool_use" and block.name == "extract_recipe":
+        if block.type == "tool_use" and block.name == tool_name:
             logger.info(
-                "Extraction complete. Input tokens: %d, output tokens: %d",
+                "Claude tool %s complete. Input tokens: %d, output tokens: %d",
+                tool_name,
                 response.usage.input_tokens,
                 response.usage.output_tokens,
             )
             return block.input
 
-    raise ExtractionError("Model did not call the extract_recipe tool")
+    raise ExtractionError(f"Model did not call the {tool_name} tool")
+
+
+def _call_claude(messages: list[dict]) -> dict:
+    """Backward-compatible helper for extraction-only callers."""
+    return _call_claude_tool(messages, EXTRACT_RECIPE_TOOL)
 
 
 def extract_from_url(url: str) -> dict:
@@ -102,6 +110,38 @@ def extract_from_image(file_bytes: bytes, filename: str) -> dict:
                 ],
             }
         ])
+    except ExtractionError:
+        raise
+    except Exception as e:
+        raise ExtractionError(f"Claude API call failed: {e}") from e
+
+
+def edit_recipe(recipe: dict, instruction: str) -> dict:
+    """Apply a natural-language edit to a structured recipe."""
+    try:
+        return _call_claude_tool(
+            [
+                {
+                    "role": "user",
+                    "content": (
+                        "You are editing an existing structured recipe. Apply the user's "
+                        "request to the recipe and call the edit_recipe tool with the full "
+                        "updated recipe, a short change summary, and any warnings.\n\n"
+                        "Rules:\n"
+                        "- Preserve all fields that are not affected by the request.\n"
+                        "- Make the smallest reasonable change.\n"
+                        "- Do not invent new details unless needed to fulfill the request.\n"
+                        "- Keep the recipe valid and complete.\n"
+                        "- Renumber steps sequentially if they change.\n"
+                        "- If the request is ambiguous, make the safest reasonable choice "
+                        "and explain it in warnings.\n\n"
+                        f"Current recipe JSON:\n{json.dumps(recipe, indent=2, sort_keys=True)}\n\n"
+                        f"User request:\n{instruction}"
+                    ),
+                }
+            ],
+            EDIT_RECIPE_TOOL,
+        )
     except ExtractionError:
         raise
     except Exception as e:

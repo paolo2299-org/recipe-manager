@@ -2,11 +2,14 @@
 
 import pytest
 
+from app.storage.db import get_db
 from app.storage.recipes import (
     delete_recipe,
     get_recipe,
     list_recipes,
+    normalize_recipe_data,
     save_recipe,
+    update_recipe,
 )
 from tests.conftest import SAMPLE_RECIPE
 
@@ -74,6 +77,77 @@ class TestListRecipes:
             save_recipe({**SAMPLE_RECIPE, "title": f"R{i}"}, "url", str(i))
 
         assert len(list_recipes(limit=2)) == 2
+
+
+class TestUpdateRecipe:
+    def test_update_roundtrips_changes(self, ctx):
+        recipe_id = save_recipe(SAMPLE_RECIPE, "url", "https://example.com")
+
+        db = get_db()
+        db.execute(
+            "UPDATE recipes SET updated_at = '2000-01-01 00:00:00' WHERE id = ?",
+            (recipe_id,),
+        )
+        db.commit()
+
+        updated = {
+            **SAMPLE_RECIPE,
+            "title": "Updated Cookies",
+            "ingredients": [
+                {"quantity": "400", "unit": "g", "name": "flour", "notes": None},
+            ],
+            "steps": [
+                {"step_number": 99, "instruction": "Mix everything together."},
+            ],
+        }
+
+        update_recipe(recipe_id, updated)
+        stored = get_recipe(recipe_id)
+
+        assert stored["title"] == "Updated Cookies"
+        assert stored["ingredients"] == updated["ingredients"]
+        assert stored["steps"] == [
+            {"step_number": 1, "instruction": "Mix everything together."}
+        ]
+        assert stored["updated_at"] != "2000-01-01 00:00:00"
+
+
+class TestNormalizeRecipeData:
+    def test_renumbers_steps_and_trims_fields(self):
+        normalized = normalize_recipe_data(
+            {
+                "title": "  Pancakes  ",
+                "description": "  Fluffy  ",
+                "servings": " 4 ",
+                "ingredients": [
+                    {"quantity": " 2 ", "unit": " cups ", "name": " flour ", "notes": " sifted "},
+                    " milk ",
+                ],
+                "steps": [
+                    {"step_number": 8, "instruction": " whisk dry ingredients "},
+                    " cook in a pan ",
+                ],
+                "tags": [" breakfast ", "", None],
+            }
+        )
+
+        assert normalized == {
+            "title": "Pancakes",
+            "description": "Fluffy",
+            "servings": "4",
+            "prep_time": None,
+            "cook_time": None,
+            "total_time": None,
+            "ingredients": [
+                {"quantity": "2", "unit": "cups", "name": "flour", "notes": "sifted"},
+                {"quantity": None, "unit": None, "name": "milk", "notes": None},
+            ],
+            "steps": [
+                {"step_number": 1, "instruction": "whisk dry ingredients"},
+                {"step_number": 2, "instruction": "cook in a pan"},
+            ],
+            "tags": ["breakfast"],
+        }
 
 
 class TestDeleteRecipe:

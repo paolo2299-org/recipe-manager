@@ -5,8 +5,20 @@ import logging
 
 from flask import Blueprint, abort, make_response, render_template, request, url_for
 
-from app.extraction.claude import ExtractionError, extract_from_image, extract_from_url
-from app.storage.recipes import delete_recipe, get_recipe, list_recipes, save_recipe
+from app.extraction.claude import (
+    ExtractionError,
+    edit_recipe,
+    extract_from_image,
+    extract_from_url,
+)
+from app.storage.recipes import (
+    delete_recipe,
+    get_recipe,
+    list_recipes,
+    normalize_recipe_data,
+    save_recipe,
+    update_recipe,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +108,69 @@ def save():
     except Exception as e:
         logger.exception("Save failed")
         return render_template("partials/extraction_error.html", error=str(e))
+
+
+@bp.route("/recipes/<recipe_id>/edit-preview", methods=["POST"])
+def edit_preview(recipe_id):
+    recipe = get_recipe(recipe_id)
+    if recipe is None:
+        abort(404)
+
+    instruction = request.form.get("instruction", "").strip()
+    if not instruction:
+        return render_template(
+            "partials/recipe_edit_error.html",
+            error="Edit instruction is required",
+        )
+
+    try:
+        result = edit_recipe(recipe, instruction)
+        edited_recipe = normalize_recipe_data(result["recipe"])
+        change_summary = result.get("change_summary", "")
+        warnings = result.get("warnings", [])
+        if not isinstance(change_summary, str):
+            raise ValueError("Change summary must be a string")
+        if not isinstance(warnings, list):
+            raise ValueError("Warnings must be a list")
+        recipe_json = json.dumps(edited_recipe)
+        return render_template(
+            "partials/recipe_edit_preview.html",
+            recipe=edited_recipe,
+            recipe_id=recipe_id,
+            recipe_json=recipe_json,
+            change_summary=change_summary,
+            warnings=warnings,
+        )
+    except ExtractionError as e:
+        logger.exception("Recipe edit preview failed")
+        return render_template("partials/recipe_edit_error.html", error=str(e))
+    except Exception as e:
+        logger.exception("Recipe edit preview failed")
+        return render_template("partials/recipe_edit_error.html", error=str(e))
+
+
+@bp.route("/recipes/<recipe_id>/apply-edit", methods=["POST"])
+def apply_edit(recipe_id):
+    recipe = get_recipe(recipe_id)
+    if recipe is None:
+        abort(404)
+
+    recipe_json = request.form.get("recipe_json")
+    if not recipe_json:
+        return render_template(
+            "partials/recipe_edit_error.html",
+            error="No edited recipe data",
+        )
+
+    try:
+        recipe_data = json.loads(recipe_json)
+        update_recipe(recipe_id, recipe_data)
+        response = make_response()
+        response.headers["HX-Redirect"] = url_for("recipes.detail", recipe_id=recipe_id)
+        return response
+    except Exception as e:
+        logger.exception("Apply edit failed")
+        return render_template("partials/recipe_edit_error.html", error=str(e))
 
 
 @bp.route("/recipes/<recipe_id>/delete", methods=["POST"])
