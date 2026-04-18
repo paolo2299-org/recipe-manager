@@ -49,6 +49,7 @@ class TestDetail:
         assert response.status_code == 200
         assert b"Test Cookies" in response.data
         assert b"Mix dry ingredients" in response.data
+        assert b"Generating edited recipe preview with AI" in response.data
 
     @patch("app.routes.recipes.get_recipe")
     def test_detail_not_found(self, mock_get, client):
@@ -58,6 +59,35 @@ class TestDetail:
 
         assert response.status_code == 404
 
+    @patch("app.routes.recipes.get_recipe")
+    def test_detail_for_idea_shows_placeholders(self, mock_get, client):
+        mock_get.return_value = {
+            "id": "idea-1",
+            "record_type": "idea",
+            "title": "Chicken shawarma bowls",
+            "description": None,
+            "servings": None,
+            "prep_time": None,
+            "cook_time": None,
+            "total_time": None,
+            "ingredients": [],
+            "steps": [],
+            "tags": ["dinner"],
+            "source_type": "manual",
+            "source_ref": "",
+            "created_at": None,
+            "updated_at": None,
+        }
+
+        response = client.get("/recipes/idea-1")
+
+        assert response.status_code == 200
+        assert b"Recipe idea" in response.data
+        assert b'href="/recipes/idea-1/edit"' in response.data
+        assert b"No ingredients saved yet." in response.data
+        assert b"No steps saved yet." in response.data
+        assert b"Generating edited recipe preview with AI" not in response.data
+
 
 class TestAdd:
     def test_add_page_renders(self, client):
@@ -66,6 +96,9 @@ class TestAdd:
         assert response.status_code == 200
         assert b"From URL" in response.data
         assert b"From Image" in response.data
+        assert b"Add Recipe Idea" in response.data
+        assert b"Cuisine Tags" in response.data
+        assert b"British" in response.data
 
 
 class TestExtractUrl:
@@ -182,6 +215,179 @@ class TestSave:
         assert b"Database down" in response.data
 
 
+class TestCreateIdea:
+    @patch("app.routes.recipes.save_recipe")
+    def test_success_redirects(self, mock_save, client):
+        mock_save.return_value = "idea-id"
+
+        response = client.post(
+            "/recipes/create-idea",
+            data={
+                "title": "Gochujang noodles",
+                "tags": ["British", "Thai"],
+                "description": "Try with sesame cucumbers.",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.headers["HX-Redirect"] == "/recipes/idea-id"
+        mock_save.assert_called_once_with(
+            {
+                "record_type": "idea",
+                "title": "Gochujang noodles",
+                "description": "Try with sesame cucumbers.",
+                "ingredients": [],
+                "steps": [],
+                "tags": ["British", "Thai"],
+            },
+            "manual",
+            "",
+        )
+
+    def test_missing_title_shows_error(self, client):
+        response = client.post(
+            "/recipes/create-idea",
+            data={"title": "", "tags": ["British"]},
+        )
+
+        assert response.status_code == 200
+        assert b"Could not save entry" in response.data
+        assert b"Title is required" in response.data
+
+    def test_invalid_tag_shows_error(self, client):
+        response = client.post(
+            "/recipes/create-idea",
+            data={"title": "Gochujang noodles", "tags": ["Not-A-Real-Tag"]},
+        )
+
+        assert response.status_code == 200
+        assert b"Could not save entry" in response.data
+        assert b"Invalid cuisine tag" in response.data
+
+
+class TestEditIdea:
+    @patch("app.routes.recipes.get_recipe")
+    def test_edit_page_renders_for_idea(self, mock_get, client):
+        mock_get.return_value = {
+            "id": "idea-1",
+            "record_type": "idea",
+            "title": "Chicken shawarma bowls",
+            "description": "Try with pickled onions.",
+            "servings": None,
+            "prep_time": None,
+            "cook_time": None,
+            "total_time": None,
+            "ingredients": [],
+            "steps": [],
+            "tags": ["British", "Thai"],
+            "source_type": "manual",
+            "source_ref": "",
+            "created_at": None,
+            "updated_at": None,
+        }
+
+        response = client.get("/recipes/idea-1/edit")
+
+        assert response.status_code == 200
+        assert b"Edit Recipe Idea" in response.data
+        assert b"Chicken shawarma bowls" in response.data
+        assert b"British" in response.data
+        assert b"Thai" in response.data
+
+    @patch("app.routes.recipes.get_recipe")
+    def test_edit_page_404_for_non_idea(self, mock_get, client):
+        mock_get.return_value = SAMPLE_RECIPE_DB
+
+        response = client.get("/recipes/abc123/edit")
+
+        assert response.status_code == 404
+
+    @patch("app.routes.recipes.update_recipe")
+    @patch("app.routes.recipes.get_recipe")
+    def test_update_redirects_to_detail(self, mock_get, mock_update, client):
+        mock_get.return_value = {
+            "id": "idea-1",
+            "record_type": "idea",
+            "title": "Chicken shawarma bowls",
+            "description": "Try with pickled onions.",
+            "servings": None,
+            "prep_time": None,
+            "cook_time": None,
+            "total_time": None,
+            "ingredients": [],
+            "steps": [],
+            "tags": ["British"],
+            "source_type": "manual",
+            "source_ref": "",
+            "created_at": None,
+            "updated_at": None,
+        }
+
+        response = client.post(
+            "/recipes/idea-1/edit",
+            data={
+                "title": "Crispy chicken shawarma bowls",
+                "tags": ["British", "Thai"],
+                "description": "Add garlicky yogurt.",
+            },
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        assert response.headers["Location"] == "/recipes/idea-1"
+        mock_update.assert_called_once_with(
+            "idea-1",
+            {
+                "id": "idea-1",
+                "record_type": "idea",
+                "title": "Crispy chicken shawarma bowls",
+                "description": "Add garlicky yogurt.",
+                "servings": None,
+                "prep_time": None,
+                "cook_time": None,
+                "total_time": None,
+                "ingredients": [],
+                "steps": [],
+                "tags": ["British", "Thai"],
+                "source_type": "manual",
+                "source_ref": "",
+                "created_at": None,
+                "updated_at": None,
+            },
+        )
+
+    @patch("app.routes.recipes.update_recipe")
+    @patch("app.routes.recipes.get_recipe")
+    def test_update_re_renders_on_error(self, mock_get, mock_update, client):
+        mock_get.return_value = {
+            "id": "idea-1",
+            "record_type": "idea",
+            "title": "Chicken shawarma bowls",
+            "description": None,
+            "servings": None,
+            "prep_time": None,
+            "cook_time": None,
+            "total_time": None,
+            "ingredients": [],
+            "steps": [],
+            "tags": ["British"],
+            "source_type": "manual",
+            "source_ref": "",
+            "created_at": None,
+            "updated_at": None,
+        }
+        mock_update.side_effect = ValueError("Title is required")
+
+        response = client.post(
+            "/recipes/idea-1/edit",
+            data={"title": "", "tags": ["British"], "description": ""},
+        )
+
+        assert response.status_code == 200
+        assert b"Could not save idea" in response.data
+        assert b"Title is required" in response.data
+
+
 class TestDelete:
     @patch("app.routes.recipes.delete_recipe")
     def test_delete_redirects(self, mock_delete, client):
@@ -239,6 +445,33 @@ class TestEditPreview:
 
         assert response.status_code == 200
         assert b"Could not update recipe" in response.data
+
+    @patch("app.routes.recipes.get_recipe")
+    def test_ideas_cannot_use_ai_edit_preview(self, mock_get, client):
+        mock_get.return_value = {
+            "id": "idea-1",
+            "record_type": "idea",
+            "title": "Chicken shawarma bowls",
+            "description": None,
+            "servings": None,
+            "prep_time": None,
+            "cook_time": None,
+            "total_time": None,
+            "ingredients": [],
+            "steps": [],
+            "tags": ["dinner"],
+            "source_type": "manual",
+            "source_ref": "",
+            "created_at": None,
+            "updated_at": None,
+        }
+
+        response = client.post(
+            "/recipes/idea-1/edit-preview",
+            data={"instruction": "add chicken"},
+        )
+
+        assert response.status_code == 404
 
 
 class TestApplyEdit:

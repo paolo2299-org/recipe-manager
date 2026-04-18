@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ recipe.title }} - Recipe Manager{% endblock %}
+{% block content %}
+<h1>Edit Recipe Idea</h1>
+
+{% if error %}
+<article class="auth-error">
+    <p role="alert"><strong>Could not save idea:</strong> {{ error }}</p>
+</article>
+{% endif %}
+
+<form action="{{ url_for('recipes.update_idea', recipe_id=recipe.id) }}" method="post">
+    <label for="idea-title">Name</label>
+    <input id="idea-title" type="text" name="title" value="{{ recipe.title }}" required>
+
+    {% include "partials/idea_tag_selector.html" %}
+
+    <label for="idea-description">Notes</label>
+    <textarea id="idea-description"
+              name="description"
+              rows="4"
+              placeholder="Anything you want to remember about this idea">{{ recipe.description or '' }}</textarea>
+
+    <div class="grid">
+        <button type="submit">Save Changes</button>
+        <a href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}" role="button" class="secondary outline">Cancel</a>
+    </div>
+</form>
+{% endblock %}

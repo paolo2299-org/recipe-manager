@@ -8,6 +8,7 @@ from flask import Flask, current_app, g
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS recipes (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_type  TEXT    NOT NULL DEFAULT 'recipe',
     title        TEXT    NOT NULL,
     description  TEXT,
     servings     TEXT,
@@ -25,6 +26,11 @@ CREATE TABLE IF NOT EXISTS recipes (
 
 CREATE INDEX IF NOT EXISTS idx_recipes_created_at ON recipes(created_at DESC);
 """
+
+
+def _has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return any(row["name"] == column for row in rows)
 
 
 def _connect(path: str) -> sqlite3.Connection:
@@ -58,6 +64,10 @@ def init_db(app: Flask) -> None:
     conn = _connect(path)
     try:
         conn.executescript(SCHEMA)
+        if not _has_column(conn, "recipes", "record_type"):
+            conn.execute(
+                "ALTER TABLE recipes ADD COLUMN record_type TEXT NOT NULL DEFAULT 'recipe'"
+            )
         conn.commit()
     finally:
         conn.close()

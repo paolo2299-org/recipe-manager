@@ -4,6 +4,9 @@
         <a href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}">
             <strong>{{ recipe.title }}</strong>
         </a>
+        {% if recipe.record_type == 'idea' %}
+        <p><small>Recipe idea</small></p>
+        {% endif %}
     </header>
     {% if recipe.description %}
     <p><small>{{ recipe.description[:120] }}{% if recipe.description|length > 120 %}...{% endif %}</small></p>

@@ -3,6 +3,7 @@
 ALLOWED_RECIPE_TAGS = [
     "African",
     "American",
+    "British",
     "Caribbean",
     "Chinese",
     "East-Asian",

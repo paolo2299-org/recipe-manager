@@ -27,6 +27,7 @@ class TestSaveRecipe:
 
         assert recipe_id.isdigit()
         stored = get_recipe(recipe_id)
+        assert stored["record_type"] == "recipe"
         assert stored["title"] == "Test Cookies"
         assert stored["source_type"] == "url"
         assert stored["source_ref"] == "https://example.com"
@@ -51,6 +52,23 @@ class TestSaveRecipe:
         assert stored["title"] == "Minimal"
         assert stored["description"] is None
         assert stored["servings"] is None
+
+    def test_save_recipe_idea_allows_empty_ingredients_and_steps(self, ctx):
+        idea = {
+            "record_type": "idea",
+            "title": "Chickpea curry",
+            "ingredients": [],
+            "steps": [],
+            "tags": ["weeknight", "vegan"],
+        }
+
+        recipe_id = save_recipe(idea, "manual", "")
+        stored = get_recipe(recipe_id)
+
+        assert stored["record_type"] == "idea"
+        assert stored["ingredients"] == []
+        assert stored["steps"] == []
+        assert stored["tags"] == ["weeknight", "vegan"]
 
 
 class TestGetRecipe:
@@ -132,6 +150,7 @@ class TestNormalizeRecipeData:
         )
 
         assert normalized == {
+            "record_type": "recipe",
             "title": "Pancakes",
             "description": "Fluffy",
             "servings": "4",
@@ -147,6 +166,30 @@ class TestNormalizeRecipeData:
                 {"step_number": 2, "instruction": "cook in a pan"},
             ],
             "tags": ["breakfast"],
+        }
+
+    def test_allows_recipe_ideas_with_empty_lists(self):
+        normalized = normalize_recipe_data(
+            {
+                "record_type": "idea",
+                "title": " Salmon rice bowl ",
+                "ingredients": [],
+                "steps": [],
+                "tags": [" dinner ", ""],
+            }
+        )
+
+        assert normalized == {
+            "record_type": "idea",
+            "title": "Salmon rice bowl",
+            "description": None,
+            "servings": None,
+            "prep_time": None,
+            "cook_time": None,
+            "total_time": None,
+            "ingredients": [],
+            "steps": [],
+            "tags": ["dinner"],
         }
 
 

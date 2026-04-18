@@ -27,6 +27,7 @@ SAMPLE_RECIPE = {
 
 SAMPLE_RECIPE_DB = {
     **SAMPLE_RECIPE,
+    "record_type": "recipe",
     "id": "abc123",
     "source_type": "url",
     "source_ref": "https://example.com/cookies",

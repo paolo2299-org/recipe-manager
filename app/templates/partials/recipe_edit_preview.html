@@ -32,6 +32,7 @@
     {% endif %}
 
     <h4>Ingredients</h4>
+    {% if recipe.ingredients %}
     <ul>
         {% for ing in recipe.ingredients %}
         <li>
@@ -42,13 +43,20 @@
         </li>
         {% endfor %}
     </ul>
+    {% else %}
+    <p><em>No ingredients saved yet.</em></p>
+    {% endif %}
 
     <h4>Steps</h4>
+    {% if recipe.steps %}
     <ol>
         {% for step in recipe.steps|sort(attribute='step_number') %}
         <li>{{ step.instruction }}</li>
         {% endfor %}
     </ol>
+    {% else %}
+    <p><em>No steps saved yet.</em></p>
+    {% endif %}
 
     {% if recipe.tags %}
     <p>

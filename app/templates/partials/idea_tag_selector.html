@@ -1,0 +1,14 @@
+<fieldset>
+    <legend>Cuisine Tags</legend>
+    <div class="tag-option-grid">
+        {% for tag in allowed_recipe_tags %}
+        <label class="tag-option">
+            <input type="checkbox"
+                   name="tags"
+                   value="{{ tag }}"
+                   {% if tag in selected_idea_tags %}checked{% endif %}>
+            <span>{{ tag }}</span>
+        </label>
+        {% endfor %}
+    </div>
+</fieldset>
