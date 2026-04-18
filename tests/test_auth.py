@@ -41,6 +41,7 @@ class TestAuthGuard:
 
         assert response.status_code == 200
         assert b"Sign in with Google" in response.data
+        assert b'<a href="/login">Sign In</a>' not in response.data
 
     def test_htmx_request_gets_hx_redirect(self, auth_client):
         response = auth_client.post(
