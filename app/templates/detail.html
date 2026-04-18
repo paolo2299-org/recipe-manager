@@ -53,6 +53,7 @@
     <form hx-post="{{ url_for('recipes.edit_preview', recipe_id=recipe.id) }}"
           hx-target="#edit-preview"
           hx-swap="innerHTML"
+          hx-indicator="#edit-preview-loading"
           hx-disabled-elt="button[type='submit']">
         <label for="instruction">Describe the change you want to make</label>
         <textarea id="instruction"
@@ -61,6 +62,11 @@
                   placeholder="For example: double the amount of tomatoes"></textarea>
         <button type="submit">Preview Edit</button>
     </form>
+    <div id="edit-preview-loading" class="htmx-indicator">
+        <article aria-busy="true">
+            Generating edited recipe preview with AI... this may take 10-15 seconds.
+        </article>
+    </div>
     <div id="edit-preview"></div>
 </section>
 

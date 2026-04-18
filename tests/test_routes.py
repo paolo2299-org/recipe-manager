@@ -49,6 +49,7 @@ class TestDetail:
         assert response.status_code == 200
         assert b"Test Cookies" in response.data
         assert b"Mix dry ingredients" in response.data
+        assert b"Generating edited recipe preview with AI" in response.data
 
     @patch("app.routes.recipes.get_recipe")
     def test_detail_not_found(self, mock_get, client):
