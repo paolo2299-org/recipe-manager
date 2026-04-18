@@ -48,6 +48,22 @@
 <p><small><strong>Source:</strong> <a href="{{ recipe.source_ref }}" target="_blank" rel="noopener">{{ recipe.source_ref }}</a></small></p>
 {% endif %}
 
+<section>
+    <h2>Edit Recipe</h2>
+    <form hx-post="{{ url_for('recipes.edit_preview', recipe_id=recipe.id) }}"
+          hx-target="#edit-preview"
+          hx-swap="innerHTML"
+          hx-disabled-elt="button[type='submit']">
+        <label for="instruction">Describe the change you want to make</label>
+        <textarea id="instruction"
+                  name="instruction"
+                  rows="3"
+                  placeholder="For example: double the amount of tomatoes"></textarea>
+        <button type="submit">Preview Edit</button>
+    </form>
+    <div id="edit-preview"></div>
+</section>
+
 <form hx-post="{{ url_for('recipes.delete', recipe_id=recipe.id) }}"
       hx-confirm="Are you sure you want to delete this recipe?">
     <button type="submit" class="secondary outline">Delete Recipe</button>

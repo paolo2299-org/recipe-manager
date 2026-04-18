@@ -1,0 +1,70 @@
+<article>
+    <header>
+        <h3>Edited Recipe Preview</h3>
+        {% if change_summary %}
+        <p><strong>Summary:</strong> {{ change_summary }}</p>
+        {% endif %}
+    </header>
+
+    {% if warnings %}
+    <section>
+        <h4>Warnings</h4>
+        <ul>
+            {% for warning in warnings %}
+            <li>{{ warning }}</li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    <h4>{{ recipe.title }}</h4>
+    {% if recipe.description %}
+    <p>{{ recipe.description }}</p>
+    {% endif %}
+
+    {% if recipe.servings or recipe.prep_time or recipe.cook_time or recipe.total_time %}
+    <div class="grid">
+        {% if recipe.servings %}<small><strong>Servings:</strong> {{ recipe.servings }}</small>{% endif %}
+        {% if recipe.prep_time %}<small><strong>Prep:</strong> {{ recipe.prep_time }}</small>{% endif %}
+        {% if recipe.cook_time %}<small><strong>Cook:</strong> {{ recipe.cook_time }}</small>{% endif %}
+        {% if recipe.total_time %}<small><strong>Total:</strong> {{ recipe.total_time }}</small>{% endif %}
+    </div>
+    {% endif %}
+
+    <h4>Ingredients</h4>
+    <ul>
+        {% for ing in recipe.ingredients %}
+        <li>
+            {% if ing.quantity %}{{ ing.quantity }}{% endif %}
+            {% if ing.unit %} {{ ing.unit }}{% endif %}
+            {{ ing.name }}
+            {% if ing.notes %}<em>({{ ing.notes }})</em>{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+
+    <h4>Steps</h4>
+    <ol>
+        {% for step in recipe.steps|sort(attribute='step_number') %}
+        <li>{{ step.instruction }}</li>
+        {% endfor %}
+    </ol>
+
+    {% if recipe.tags %}
+    <p>
+        {% for tag in recipe.tags %}
+        <kbd>{{ tag }}</kbd>
+        {% endfor %}
+    </p>
+    {% endif %}
+
+    <footer>
+        <form hx-post="{{ url_for('recipes.apply_edit', recipe_id=recipe_id) }}"
+              hx-target="#edit-preview"
+              hx-swap="innerHTML"
+              hx-disabled-elt="button[type='submit']">
+            <textarea hidden name="recipe_json">{{ recipe_json }}</textarea>
+            <button type="submit">Apply Changes</button>
+        </form>
+    </footer>
+</article>

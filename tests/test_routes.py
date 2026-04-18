@@ -191,3 +191,76 @@ class TestDelete:
         assert "HX-Redirect" in response.headers
         assert response.headers["HX-Redirect"] == "/"
         mock_delete.assert_called_once_with("abc123")
+
+
+class TestEditPreview:
+    @patch("app.routes.recipes.edit_recipe")
+    @patch("app.routes.recipes.get_recipe")
+    def test_success(self, mock_get, mock_edit, client):
+        mock_get.return_value = SAMPLE_RECIPE_DB
+        mock_edit.return_value = {
+            "recipe": {**SAMPLE_RECIPE, "title": "Peruvian Pancakes"},
+            "change_summary": "Changed the recipe title.",
+            "warnings": ["Servings were left unchanged."],
+        }
+
+        response = client.post(
+            "/recipes/abc123/edit-preview",
+            data={"instruction": "change the title to Peruvian Pancakes"},
+        )
+
+        assert response.status_code == 200
+        assert b"Edited Recipe Preview" in response.data
+        assert b"Peruvian Pancakes" in response.data
+        assert b"Changed the recipe title." in response.data
+        assert b"Apply Changes" in response.data
+
+    @patch("app.routes.recipes.get_recipe")
+    def test_missing_instruction(self, mock_get, client):
+        mock_get.return_value = SAMPLE_RECIPE_DB
+
+        response = client.post("/recipes/abc123/edit-preview", data={"instruction": ""})
+
+        assert response.status_code == 200
+        assert b"Edit instruction is required" in response.data
+
+    @patch("app.routes.recipes.edit_recipe")
+    @patch("app.routes.recipes.get_recipe")
+    def test_model_error(self, mock_get, mock_edit, client):
+        from app.extraction.claude import ExtractionError
+
+        mock_get.return_value = SAMPLE_RECIPE_DB
+        mock_edit.side_effect = ExtractionError("Could not update recipe")
+
+        response = client.post(
+            "/recipes/abc123/edit-preview",
+            data={"instruction": "double the tomatoes"},
+        )
+
+        assert response.status_code == 200
+        assert b"Could not update recipe" in response.data
+
+
+class TestApplyEdit:
+    @patch("app.routes.recipes.update_recipe")
+    @patch("app.routes.recipes.get_recipe")
+    def test_success_redirects(self, mock_get, mock_update, client):
+        mock_get.return_value = SAMPLE_RECIPE_DB
+
+        response = client.post(
+            "/recipes/abc123/apply-edit",
+            data={"recipe_json": json.dumps(SAMPLE_RECIPE)},
+        )
+
+        assert response.status_code == 200
+        assert response.headers["HX-Redirect"] == "/recipes/abc123"
+        mock_update.assert_called_once_with("abc123", SAMPLE_RECIPE)
+
+    @patch("app.routes.recipes.get_recipe")
+    def test_missing_recipe_json(self, mock_get, client):
+        mock_get.return_value = SAMPLE_RECIPE_DB
+
+        response = client.post("/recipes/abc123/apply-edit", data={})
+
+        assert response.status_code == 200
+        assert b"No edited recipe data" in response.data
