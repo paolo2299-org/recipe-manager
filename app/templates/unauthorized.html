@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Access Denied - Recipe Manager{% endblock %}
+{% block content %}
+<section class="auth-shell">
+    <article class="auth-card">
+        <h1>Access denied</h1>
+        <p>
+            {% if email %}
+            <strong>{{ email }}</strong> is not on the allowed Google account list for this app.
+            {% else %}
+            This Google account is not on the allowed list for this app.
+            {% endif %}
+        </p>
+        <p>Please sign in with an approved account or update the allowlist in the app config.</p>
+        <p>
+            <a href="{{ url_for('auth.login') }}" role="button" class="secondary">
+                Try another account
+            </a>
+        </p>
+    </article>
+</section>
+{% endblock %}

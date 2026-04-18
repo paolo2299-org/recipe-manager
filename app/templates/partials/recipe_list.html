@@ -1,0 +1,20 @@
+{% for recipe in recipes %}
+<article>
+    <header>
+        <a href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}">
+            <strong>{{ recipe.title }}</strong>
+        </a>
+    </header>
+    {% if recipe.description %}
+    <p><small>{{ recipe.description[:120] }}{% if recipe.description|length > 120 %}...{% endif %}</small></p>
+    {% endif %}
+    <footer>
+        {% if recipe.total_time %}<small>{{ recipe.total_time }}</small>{% endif %}
+        {% if recipe.tags %}
+        {% for tag in recipe.tags[:3] %}
+        <kbd>{{ tag }}</kbd>
+        {% endfor %}
+        {% endif %}
+    </footer>
+</article>
+{% endfor %}

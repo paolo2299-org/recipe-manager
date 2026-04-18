@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<hgroup>
+    <h1>Recipes</h1>
+    {% if load_error %}
+    <p>The recipe database is not available. Fix the configuration below, then refresh.</p>
+    {% else %}
+    <p>{{ recipes|length }} recipe{{ 's' if recipes|length != 1 else '' }} in your collection</p>
+    {% endif %}
+</hgroup>
+
+{% if load_error %}
+<article>
+    <strong>Database error</strong>
+    <p>{{ load_error }}</p>
+</article>
+{% elif recipes %}
+<div class="recipe-grid">
+    {% include "partials/recipe_list.html" %}
+</div>
+{% else %}
+<article>
+    <p>No recipes yet. <a href="{{ url_for('recipes.add') }}">Add your first recipe</a>.</p>
+</article>
+{% endif %}
+{% endblock %}

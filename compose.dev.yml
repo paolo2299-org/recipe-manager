@@ -1,0 +1,24 @@
+services:
+  recipe-manager:
+    build:
+      context: .
+    command: flask --app app run --debug --host=0.0.0.0 --port=8080
+    environment:
+      FLASK_ENV: development
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  test:
+    build:
+      context: .
+    command: python -m pytest tests/ -v
+    env_file:
+      - ${ENV_FILE:-.env}
+    environment:
+      FLASK_ENV: development
+      DATABASE_PATH: /app/data/recipes.db
+    volumes:
+      - .:/app

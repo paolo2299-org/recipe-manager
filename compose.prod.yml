@@ -1,0 +1,13 @@
+services:
+  recipe-manager:
+    environment:
+      FLASK_ENV: production
+    restart: unless-stopped
+    volumes:
+      - /srv/recipe-manager/data:/app/data
+    networks:
+      - web
+
+networks:
+  web:
+    external: true

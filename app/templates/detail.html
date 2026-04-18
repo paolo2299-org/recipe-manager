@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ recipe.title }} - Recipe Manager{% endblock %}
+{% block content %}
+<hgroup>
+    <h1>{{ recipe.title }}</h1>
+    {% if recipe.description %}
+    <p>{{ recipe.description }}</p>
+    {% endif %}
+</hgroup>
+
+{% if recipe.servings or recipe.prep_time or recipe.cook_time or recipe.total_time %}
+<div class="recipe-meta">
+    {% if recipe.servings %}<small><strong>Servings:</strong> {{ recipe.servings }}</small>{% endif %}
+    {% if recipe.prep_time %}<small><strong>Prep:</strong> {{ recipe.prep_time }}</small>{% endif %}
+    {% if recipe.cook_time %}<small><strong>Cook:</strong> {{ recipe.cook_time }}</small>{% endif %}
+    {% if recipe.total_time %}<small><strong>Total:</strong> {{ recipe.total_time }}</small>{% endif %}
+</div>
+{% endif %}
+
+{% if recipe.tags %}
+<p>
+    {% for tag in recipe.tags %}
+    <kbd>{{ tag }}</kbd>
+    {% endfor %}
+</p>
+{% endif %}
+
+<h2>Ingredients</h2>
+<ul>
+    {% for ing in recipe.ingredients %}
+    <li>
+        {% if ing.quantity %}{{ ing.quantity }}{% endif %}
+        {% if ing.unit %} {{ ing.unit }}{% endif %}
+        {{ ing.name }}
+        {% if ing.notes %}<em>({{ ing.notes }})</em>{% endif %}
+    </li>
+    {% endfor %}
+</ul>
+
+<h2>Steps</h2>
+<ol>
+    {% for step in recipe.steps|sort(attribute='step_number') %}
+    <li>{{ step.instruction }}</li>
+    {% endfor %}
+</ol>
+
+{% if recipe.source_type == 'url' and recipe.source_ref %}
+<p><small><strong>Source:</strong> <a href="{{ recipe.source_ref }}" target="_blank" rel="noopener">{{ recipe.source_ref }}</a></small></p>
+{% endif %}
+
+<form hx-post="{{ url_for('recipes.delete', recipe_id=recipe.id) }}"
+      hx-confirm="Are you sure you want to delete this recipe?">
+    <button type="submit" class="secondary outline">Delete Recipe</button>
+</form>
+{% endblock %}

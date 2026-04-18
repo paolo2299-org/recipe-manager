@@ -1,0 +1,8 @@
+services:
+  recipe-manager:
+    image: ${IMAGE_NAME:-recipe-manager}:${IMAGE_TAG:-main}
+    env_file:
+      - ${ENV_FILE:-.env}
+    environment:
+      DATABASE_PATH: /app/data/recipes.db
+      PORT: 8080

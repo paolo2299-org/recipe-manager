@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Add Recipe - Recipe Manager{% endblock %}
+{% block content %}
+<h1>Add Recipe</h1>
+
+<section>
+    <h2>From URL</h2>
+    <form hx-post="{{ url_for('recipes.extract_url') }}"
+          hx-target="#result"
+          hx-indicator="#loading"
+          hx-disabled-elt="button[type='submit']">
+        <fieldset role="group">
+            <input type="url" name="url" placeholder="https://example.com/recipe" required>
+            <button type="submit">Extract</button>
+        </fieldset>
+    </form>
+</section>
+
+<section>
+    <h2>From Image</h2>
+    <form hx-post="{{ url_for('recipes.extract_image') }}"
+          hx-target="#result"
+          hx-indicator="#loading"
+          hx-encoding="multipart/form-data"
+          hx-disabled-elt="button[type='submit']">
+        <input type="file" name="image" accept=".jpg,.jpeg,.png,.webp,.gif" required>
+        <button type="submit">Extract</button>
+    </form>
+</section>
+
+<div id="loading" class="htmx-indicator">
+    <article aria-busy="true">
+        Extracting recipe with AI... this may take 10-15 seconds.
+    </article>
+</div>
+
+<div id="result"></div>
+{% endblock %}

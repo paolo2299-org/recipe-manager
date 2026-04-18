@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Recipe Manager{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body>
+    <header class="container">
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('recipes.index') }}"><strong>Recipe Manager</strong></a></li>
+            </ul>
+            <ul>
+                {% if current_user %}
+                <li><a href="{{ url_for('recipes.index') }}">Recipes</a></li>
+                <li><a href="{{ url_for('recipes.add') }}">Add Recipe</a></li>
+                <li><small class="nav-user">{{ current_user.email }}</small></li>
+                <li>
+                    <form action="{{ url_for('auth.logout') }}" method="post" class="inline-form">
+                        <button type="submit" class="secondary">Sign Out</button>
+                    </form>
+                </li>
+                {% elif google_auth_enabled %}
+                <li><a href="{{ url_for('auth.login') }}">Sign In</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </header>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

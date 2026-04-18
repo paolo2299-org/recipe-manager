@@ -1,0 +1,58 @@
+/* Loading indicator: hidden by default, shown by HTMX during requests */
+.htmx-indicator {
+    display: none;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+    display: block;
+}
+
+/* Recipe list grid */
+.recipe-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.recipe-grid article {
+    margin-bottom: 0;
+}
+
+/* Tags */
+kbd {
+    margin-right: 0.25rem;
+}
+
+/* Metadata row */
+.recipe-meta {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.inline-form {
+    margin: 0;
+}
+
+.inline-form button {
+    margin-bottom: 0;
+}
+
+.nav-user {
+    white-space: nowrap;
+}
+
+.auth-shell {
+    display: flex;
+    justify-content: center;
+    padding: 3rem 0;
+}
+
+.auth-card {
+    width: min(100%, 36rem);
+}
+
+.auth-error {
+    border-left: 4px solid var(--pico-del-color);
+}
