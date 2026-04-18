@@ -4,7 +4,7 @@ A web application for extracting and saving structured recipe data from photos a
 
 ## Overview
 
-Upload a photo of a recipe or paste a URL, and the app uses Claude to extract structured information — title, ingredients, steps, timings, and tags. Recipes are saved to a local SQLite database and can be browsed, viewed, and deleted.
+Upload a photo of a recipe or paste a URL, and the app uses Claude to extract structured information — title, ingredients, steps, timings, and tags. You can also save lightweight recipe ideas with just a name, notes, and tags. Entries are stored in a local SQLite database and can be browsed, viewed, and deleted.
 
 Built with Flask, HTMX, Pico CSS, SQLite, and Google OpenID Connect. Intended for self-hosted deployment.
 

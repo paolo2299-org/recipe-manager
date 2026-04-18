@@ -7,7 +7,9 @@ from .db import get_db
 TABLE = "recipes"
 
 _JSON_FIELDS = ("ingredients", "steps", "tags")
-_OPTIONAL_FIELDS = ("description", "servings", "prep_time", "cook_time", "total_time")
+RECORD_TYPE_RECIPE = "recipe"
+RECORD_TYPE_IDEA = "idea"
+_RECORD_TYPES = {RECORD_TYPE_RECIPE, RECORD_TYPE_IDEA}
 
 
 def _row_to_dict(row) -> dict:
@@ -31,6 +33,13 @@ def _normalize_optional_string(value) -> str | None:
         value = str(value)
     value = value.strip()
     return value or None
+
+
+def _normalize_record_type(value) -> str:
+    normalized = _normalize_optional_string(value) or RECORD_TYPE_RECIPE
+    if normalized not in _RECORD_TYPES:
+        raise ValueError("Record type must be 'recipe' or 'idea'")
+    return normalized
 
 
 def _normalize_ingredient(item: dict | str) -> dict:
@@ -69,18 +78,24 @@ def normalize_recipe_data(recipe_data: dict) -> dict:
     if not isinstance(recipe_data, dict):
         raise ValueError("Recipe data must be an object")
 
-    ingredients = recipe_data.get("ingredients")
-    steps = recipe_data.get("steps")
+    record_type = _normalize_record_type(recipe_data.get("record_type"))
+    ingredients = recipe_data.get("ingredients", [])
+    steps = recipe_data.get("steps", [])
     tags = recipe_data.get("tags", [])
 
-    if not isinstance(ingredients, list) or not ingredients:
+    if not isinstance(ingredients, list):
+        raise ValueError("Ingredients must be a list")
+    if not isinstance(steps, list):
+        raise ValueError("Steps must be a list")
+    if record_type == RECORD_TYPE_RECIPE and not ingredients:
         raise ValueError("At least one ingredient is required")
-    if not isinstance(steps, list) or not steps:
+    if record_type == RECORD_TYPE_RECIPE and not steps:
         raise ValueError("At least one step is required")
     if not isinstance(tags, list):
         raise ValueError("Tags must be a list")
 
     return {
+        "record_type": record_type,
         "title": _normalize_required_string(recipe_data.get("title"), "title"),
         "description": _normalize_optional_string(recipe_data.get("description")),
         "servings": _normalize_optional_string(recipe_data.get("servings")),
@@ -103,6 +118,7 @@ def normalize_recipe_data(recipe_data: dict) -> dict:
 def _recipe_values(recipe_data: dict) -> tuple:
     normalized = normalize_recipe_data(recipe_data)
     return (
+        normalized["record_type"],
         normalized["title"],
         normalized["description"],
         normalized["servings"],
@@ -122,9 +138,9 @@ def save_recipe(recipe_data: dict, source_type: str, source_ref: str) -> str:
     cursor = db.execute(
         f"""
         INSERT INTO {TABLE} (
-            title, description, servings, prep_time, cook_time, total_time,
+            record_type, title, description, servings, prep_time, cook_time, total_time,
             ingredients, steps, tags, source_type, source_ref
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         recipe_values + (source_type, source_ref),
     )
@@ -159,7 +175,8 @@ def update_recipe(recipe_id: str, recipe_data: dict) -> None:
     db.execute(
         f"""
         UPDATE {TABLE}
-        SET title = ?,
+        SET record_type = ?,
+            title = ?,
             description = ?,
             servings = ?,
             prep_time = ?,

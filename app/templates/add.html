@@ -28,6 +28,28 @@
     </form>
 </section>
 
+<section>
+    <h2>Add Recipe Idea</h2>
+    <p>Save a dish name and a few tags now, then fill in the full recipe later.</p>
+    <form hx-post="{{ url_for('recipes.create_idea') }}"
+          hx-target="#result"
+          hx-swap="innerHTML"
+          hx-disabled-elt="button[type='submit']">
+        <label for="idea-title">Name</label>
+        <input id="idea-title" type="text" name="title" placeholder="e.g. gochujang salmon bowls" required>
+
+        {% include "partials/idea_tag_selector.html" %}
+
+        <label for="idea-description">Notes</label>
+        <textarea id="idea-description"
+                  name="description"
+                  rows="3"
+                  placeholder="Anything you want to remember about this idea"></textarea>
+
+        <button type="submit">Save Idea</button>
+    </form>
+</section>
+
 <div id="loading" class="htmx-indicator">
     <article aria-busy="true">
         Extracting recipe with AI... this may take 10-15 seconds.
