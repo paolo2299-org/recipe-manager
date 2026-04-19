@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Add Recipe Idea - Recipe Manager{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('recipes.add') }}">&larr; Back</a></p>
+<h1>Add Recipe Idea</h1>
+<p>Save a dish name and a few tags now, then fill in the full recipe later.</p>
+
+<form hx-post="{{ url_for('recipes.create_idea') }}"
+      hx-target="#result"
+      hx-swap="innerHTML"
+      hx-disabled-elt="button[type='submit']">
+    <label for="idea-title">Name</label>
+    <input id="idea-title" type="text" name="title" placeholder="e.g. gochujang salmon bowls" required>
+
+    {% include "partials/idea_tag_selector.html" %}
+
+    <label for="idea-description">Notes</label>
+    <textarea id="idea-description"
+              name="description"
+              rows="3"
+              placeholder="Anything you want to remember about this idea"></textarea>
+
+    <button type="submit">Save Idea</button>
+</form>
+
+<div id="result"></div>
+{% endblock %}
