@@ -3,7 +3,7 @@
 import os
 
 
-def parse_email_allowlist(value):
+def parse_email_allowlist(value: str | None) -> frozenset[str]:
     """Parse a comma-separated allowlist into a normalized set."""
     if not value:
         return frozenset()

@@ -1,10 +1,12 @@
 """Per-serving calorie calculation for recipes."""
 
+from typing import Any, Mapping
+
+from app.schemas.recipe import RECORD_TYPE_IDEA
 from app.storage.calories import get_calorie
-from app.storage.recipes import RECORD_TYPE_IDEA
 
 
-def parse_quantity(value) -> float | None:
+def parse_quantity(value: Any) -> float | None:
     """Parse a quantity string into a float.
 
     Accepts integers, decimals, simple fractions ("1/2"), and mixed fractions
@@ -12,9 +14,9 @@ def parse_quantity(value) -> float | None:
     """
     if value is None:
         return None
+    if isinstance(value, bool):
+        return None
     if isinstance(value, (int, float)):
-        if isinstance(value, bool):
-            return None
         return float(value)
     if not isinstance(value, str):
         return None
@@ -48,7 +50,7 @@ def parse_quantity(value) -> float | None:
     return None
 
 
-def calculate_calories_per_serving(recipe: dict) -> float | None:
+def calculate_calories_per_serving(recipe: Mapping[str, Any]) -> float | None:
     """Compute the per-serving calorie count, or None if the data is incomplete."""
     if recipe.get("record_type") == RECORD_TYPE_IDEA:
         return None
@@ -63,12 +65,18 @@ def calculate_calories_per_serving(recipe: dict) -> float | None:
 
     total = 0.0
     for ingredient in ingredients:
-        if not isinstance(ingredient, dict):
+        if not isinstance(ingredient, Mapping):
             return None
         quantity = parse_quantity(ingredient.get("quantity"))
         if quantity is None:
             return None
-        calorie_row = get_calorie(ingredient.get("name"), ingredient.get("unit"))
+        name = ingredient.get("name")
+        if not isinstance(name, str):
+            return None
+        unit = ingredient.get("unit")
+        if unit is not None and not isinstance(unit, str):
+            return None
+        calorie_row = get_calorie(name, unit)
         if calorie_row is None:
             return None
         reference = calorie_row["reference_quantity"]

@@ -2,8 +2,20 @@
 
 import json
 import logging
+from typing import Any
 
-from flask import Blueprint, abort, make_response, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    Response,
+    abort,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+from pydantic import ValidationError
+from werkzeug.wrappers import Response as WerkzeugResponse
 
 from app.extraction.claude import (
     ExtractionError,
@@ -11,7 +23,14 @@ from app.extraction.claude import (
     extract_from_image,
     extract_from_url,
 )
-from app.extraction.schema import ALLOWED_RECIPE_TAGS
+from app.schemas.forms import (
+    CalorieBatchForm,
+    EditInstructionForm,
+    ExtractUrlForm,
+    IdeaForm,
+    first_error_msg,
+)
+from app.schemas.recipe import ALLOWED_RECIPE_TAGS
 from app.storage.calories import list_missing_for_recipe, upsert_calorie
 from app.storage.recipes import (
     RECORD_TYPE_IDEA,
@@ -26,23 +45,9 @@ from app.storage.recipes import (
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("recipes", __name__)
-_ALLOWED_RECIPE_TAGS_SET = set(ALLOWED_RECIPE_TAGS)
 
 
-def _parse_idea_tags(raw_tags: list[str]) -> list[str]:
-    selected_tags = []
-    for raw_tag in raw_tags:
-        tag = raw_tag.strip()
-        if not tag:
-            continue
-        if tag not in _ALLOWED_RECIPE_TAGS_SET:
-            raise ValueError(f"Invalid cuisine tag: {tag}")
-        if tag not in selected_tags:
-            selected_tags.append(tag)
-    return selected_tags
-
-
-def _get_idea_or_404(recipe_id: str) -> dict:
+def _get_idea_or_404(recipe_id: str) -> dict[str, Any]:
     recipe = get_recipe(recipe_id)
     if recipe is None or recipe.get("record_type") != RECORD_TYPE_IDEA:
         abort(404)
@@ -50,10 +55,10 @@ def _get_idea_or_404(recipe_id: str) -> dict:
 
 
 @bp.route("/")
-def index():
+def index() -> str:
     try:
         recipes = list_recipes()
-        load_error = None
+        load_error: str | None = None
     except Exception as e:
         logger.exception("Failed to load recipes")
         recipes = []
@@ -63,7 +68,7 @@ def index():
 
 
 @bp.route("/recipes/<recipe_id>")
-def detail(recipe_id):
+def detail(recipe_id: str) -> str:
     recipe = get_recipe(recipe_id)
     if recipe is None:
         abort(404)
@@ -71,7 +76,7 @@ def detail(recipe_id):
 
 
 @bp.route("/recipes/<recipe_id>/edit")
-def edit_idea(recipe_id):
+def edit_idea(recipe_id: str) -> str:
     recipe = _get_idea_or_404(recipe_id)
     return render_template(
         "edit_idea.html",
@@ -83,29 +88,43 @@ def edit_idea(recipe_id):
 
 
 @bp.route("/recipes/<recipe_id>/edit", methods=["POST"])
-def update_idea(recipe_id):
+def update_idea(recipe_id: str) -> Response | WerkzeugResponse | str:
     recipe = _get_idea_or_404(recipe_id)
-    title = request.form.get("title", "")
-    description = request.form.get("description", "")
-    selected_idea_tags = []
+    submitted_title = request.form.get("title", "")
+    submitted_description = request.form.get("description", "")
+    selected_idea_tags: list[str] = []
     try:
-        selected_idea_tags = _parse_idea_tags(request.form.getlist("tags"))
+        form = IdeaForm.from_form(request.form)
+        selected_idea_tags = form.tags
         updated_idea = {
             **recipe,
-            "title": title,
-            "description": description,
-            "tags": selected_idea_tags,
+            "title": form.title,
+            "description": form.description,
+            "tags": form.tags,
         }
         update_recipe(recipe_id, updated_idea)
         return redirect(url_for("recipes.detail", recipe_id=recipe_id))
+    except ValidationError as e:
+        logger.info("Idea update failed validation")
+        return render_template(
+            "edit_idea.html",
+            recipe={
+                **recipe,
+                "title": submitted_title,
+                "description": submitted_description,
+            },
+            allowed_recipe_tags=ALLOWED_RECIPE_TAGS,
+            selected_idea_tags=selected_idea_tags,
+            error=first_error_msg(e),
+        )
     except Exception as e:
         logger.exception("Idea update failed")
         return render_template(
             "edit_idea.html",
             recipe={
                 **recipe,
-                "title": title,
-                "description": description,
+                "title": submitted_title,
+                "description": submitted_description,
             },
             allowed_recipe_tags=ALLOWED_RECIPE_TAGS,
             selected_idea_tags=selected_idea_tags,
@@ -114,7 +133,7 @@ def update_idea(recipe_id):
 
 
 @bp.route("/recipes/<recipe_id>/calories/edit")
-def edit_calories(recipe_id):
+def edit_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
     recipe = get_recipe(recipe_id)
     if recipe is None or recipe.get("record_type") == RECORD_TYPE_IDEA:
         abort(404)
@@ -130,31 +149,31 @@ def edit_calories(recipe_id):
 
 
 @bp.route("/recipes/<recipe_id>/calories/edit", methods=["POST"])
-def save_calories(recipe_id):
+def save_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
     recipe = get_recipe(recipe_id)
     if recipe is None or recipe.get("record_type") == RECORD_TYPE_IDEA:
         abort(404)
 
-    names = request.form.getlist("name")
-    units = request.form.getlist("unit")
-    reference_quantities = request.form.getlist("reference_quantity")
-    calories_values = request.form.getlist("calories")
-
     try:
-        for name, unit, reference_quantity, calories in zip(
-            names, units, reference_quantities, calories_values
-        ):
-            reference_quantity = reference_quantity.strip()
-            calories = calories.strip()
-            if not reference_quantity and not calories:
-                continue
-            if not reference_quantity or not calories:
-                raise ValueError(
-                    f"Both reference quantity and calories are required for {name}"
-                )
-            upsert_calorie(name, unit or None, float(reference_quantity), float(calories))
+        batch = CalorieBatchForm.from_form(request.form)
+        for entry in batch.entries:
+            upsert_calorie(
+                entry["name"],
+                entry["unit"],
+                float(entry["reference_quantity"]),
+                float(entry["calories"]),
+            )
         update_recipe(recipe_id, recipe)
         return redirect(url_for("recipes.detail", recipe_id=recipe_id))
+    except ValidationError as e:
+        logger.info("Saving calorie info failed validation")
+        missing = list_missing_for_recipe(recipe)
+        return render_template(
+            "edit_calories.html",
+            recipe=recipe,
+            missing=missing,
+            error=first_error_msg(e),
+        )
     except Exception as e:
         logger.exception("Saving calorie info failed")
         missing = list_missing_for_recipe(recipe)
@@ -167,7 +186,7 @@ def save_calories(recipe_id):
 
 
 @bp.route("/recipes/add")
-def add():
+def add() -> str:
     return render_template(
         "add.html",
         allowed_recipe_tags=ALLOWED_RECIPE_TAGS,
@@ -176,19 +195,21 @@ def add():
 
 
 @bp.route("/recipes/extract/url", methods=["POST"])
-def extract_url():
-    url = request.form.get("url", "").strip()
-    if not url:
-        return render_template("partials/extraction_error.html", error="URL is required")
+def extract_url() -> str:
     try:
-        recipe_data = extract_from_url(url)
+        form = ExtractUrlForm.model_validate({"url": request.form.get("url", "")})
+    except ValidationError as e:
+        return render_template("partials/extraction_error.html", error=first_error_msg(e))
+
+    try:
+        recipe_data = extract_from_url(form.url)
         recipe_json = json.dumps(recipe_data)
         return render_template(
             "partials/extraction_result.html",
             recipe=recipe_data,
             recipe_json=recipe_json,
             source_type="url",
-            source_ref=url,
+            source_ref=form.url,
         )
     except ExtractionError as e:
         logger.exception("URL extraction failed")
@@ -196,13 +217,14 @@ def extract_url():
 
 
 @bp.route("/recipes/extract/image", methods=["POST"])
-def extract_image():
+def extract_image() -> str:
     file = request.files.get("image")
-    if not file or file.filename == "":
+    if not file or not file.filename:
         return render_template("partials/extraction_error.html", error="Image is required")
+    filename = file.filename
     try:
         file_bytes = file.read()
-        recipe_data = extract_from_image(file_bytes, file.filename)
+        recipe_data = extract_from_image(file_bytes, filename)
         recipe_json = json.dumps(recipe_data)
         return render_template(
             "partials/extraction_result.html",
@@ -217,7 +239,7 @@ def extract_image():
 
 
 @bp.route("/recipes/save", methods=["POST"])
-def save():
+def save() -> Response | str:
     recipe_json = request.form.get("recipe_json")
     source_type = request.form.get("source_type", "")
     source_ref = request.form.get("source_ref", "")
@@ -235,42 +257,49 @@ def save():
 
 
 @bp.route("/recipes/create-idea", methods=["POST"])
-def create_idea():
+def create_idea() -> Response | str:
     try:
+        form = IdeaForm.from_form(request.form)
         idea_data = {
             "record_type": RECORD_TYPE_IDEA,
-            "title": request.form.get("title", ""),
-            "description": request.form.get("description", ""),
+            "title": form.title,
+            "description": form.description,
             "ingredients": [],
             "steps": [],
-            "tags": _parse_idea_tags(request.form.getlist("tags")),
+            "tags": form.tags,
         }
         recipe_id = save_recipe(idea_data, "manual", "")
         response = make_response()
         response.headers["HX-Redirect"] = url_for("recipes.detail", recipe_id=recipe_id)
         return response
+    except ValidationError as e:
+        logger.info("Idea save failed validation")
+        return render_template("partials/entry_error.html", error=first_error_msg(e))
     except Exception as e:
         logger.exception("Idea save failed")
         return render_template("partials/entry_error.html", error=str(e))
 
 
 @bp.route("/recipes/<recipe_id>/edit-preview", methods=["POST"])
-def edit_preview(recipe_id):
+def edit_preview(recipe_id: str) -> str:
     recipe = get_recipe(recipe_id)
     if recipe is None:
         abort(404)
     if recipe.get("record_type") == RECORD_TYPE_IDEA:
         abort(404)
 
-    instruction = request.form.get("instruction", "").strip()
-    if not instruction:
+    try:
+        instruction_form = EditInstructionForm.model_validate(
+            {"instruction": request.form.get("instruction", "")}
+        )
+    except ValidationError as e:
         return render_template(
             "partials/recipe_edit_error.html",
-            error="Edit instruction is required",
+            error=first_error_msg(e),
         )
 
     try:
-        result = edit_recipe(recipe, instruction)
+        result = edit_recipe(recipe, instruction_form.instruction)
         edited_recipe = normalize_recipe_data(
             {
                 **result["recipe"],
@@ -279,10 +308,6 @@ def edit_preview(recipe_id):
         )
         change_summary = result.get("change_summary", "")
         warnings = result.get("warnings", [])
-        if not isinstance(change_summary, str):
-            raise ValueError("Change summary must be a string")
-        if not isinstance(warnings, list):
-            raise ValueError("Warnings must be a list")
         recipe_json = json.dumps(edited_recipe)
         return render_template(
             "partials/recipe_edit_preview.html",
@@ -301,7 +326,7 @@ def edit_preview(recipe_id):
 
 
 @bp.route("/recipes/<recipe_id>/apply-edit", methods=["POST"])
-def apply_edit(recipe_id):
+def apply_edit(recipe_id: str) -> Response | str:
     recipe = get_recipe(recipe_id)
     if recipe is None:
         abort(404)
@@ -325,7 +350,7 @@ def apply_edit(recipe_id):
 
 
 @bp.route("/recipes/<recipe_id>/delete", methods=["POST"])
-def delete(recipe_id):
+def delete(recipe_id: str) -> Response:
     delete_recipe(recipe_id)
     response = make_response()
     response.headers["HX-Redirect"] = url_for("recipes.index")

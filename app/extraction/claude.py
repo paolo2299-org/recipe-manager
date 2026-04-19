@@ -2,6 +2,7 @@
 
 import json
 import logging
+from typing import Any
 
 import anthropic
 
@@ -17,11 +18,13 @@ class ExtractionError(Exception):
     pass
 
 
-def _call_claude_tool(messages: list[dict], tool: dict) -> dict:
+def _call_claude_tool(
+    messages: list[dict[str, Any]], tool: dict[str, Any]
+) -> dict[str, Any]:
     """Send messages to Claude with forced tool use and return the tool payload."""
     tool_name = tool["name"]
     client = anthropic.Anthropic()
-    response = client.messages.create(
+    response = client.messages.create(  # type: ignore[call-overload]
         model="claude-sonnet-4-6",
         max_tokens=4096,
         tools=[tool],
@@ -37,17 +40,22 @@ def _call_claude_tool(messages: list[dict], tool: dict) -> dict:
                 response.usage.input_tokens,
                 response.usage.output_tokens,
             )
-            return block.input
+            payload = block.input
+            if not isinstance(payload, dict):
+                raise ExtractionError(
+                    f"Tool {tool_name} returned a non-object payload"
+                )
+            return payload
 
     raise ExtractionError(f"Model did not call the {tool_name} tool")
 
 
-def _call_claude(messages: list[dict]) -> dict:
-    """Backward-compatible helper for extraction-only callers."""
+def _call_claude(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    """Invoke the extract_recipe tool and return its raw payload."""
     return _call_claude_tool(messages, EXTRACT_RECIPE_TOOL)
 
 
-def extract_from_url(url: str) -> dict:
+def extract_from_url(url: str) -> dict[str, Any]:
     """Extract a recipe from a webpage URL via Jina Reader + Claude."""
     logger.info("Fetching %s via Jina Reader...", url)
     try:
@@ -74,7 +82,7 @@ def extract_from_url(url: str) -> dict:
         raise ExtractionError(f"Claude API call failed: {e}") from e
 
 
-def extract_from_image(file_bytes: bytes, filename: str) -> dict:
+def extract_from_image(file_bytes: bytes, filename: str) -> dict[str, Any]:
     """Extract a recipe from an uploaded image via Claude vision."""
     logger.info("Preparing image: %s", filename)
     try:
@@ -116,7 +124,7 @@ def extract_from_image(file_bytes: bytes, filename: str) -> dict:
         raise ExtractionError(f"Claude API call failed: {e}") from e
 
 
-def edit_recipe(recipe: dict, instruction: str) -> dict:
+def edit_recipe(recipe: dict[str, Any], instruction: str) -> dict[str, Any]:
     """Apply a natural-language edit to a structured recipe."""
     try:
         return _call_claude_tool(

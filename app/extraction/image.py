@@ -40,7 +40,7 @@ def prepare_image(file_bytes: bytes, filename: str) -> tuple[str, str]:
     img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
 
     if max(img.size) > MAX_DIMENSION:
-        img.thumbnail((MAX_DIMENSION, MAX_DIMENSION), Image.LANCZOS)
+        img.thumbnail((MAX_DIMENSION, MAX_DIMENSION), Image.Resampling.LANCZOS)
         logger.info("Resized to %dx%d", img.size[0], img.size[1])
 
     buf = io.BytesIO()

@@ -1,0 +1,24 @@
+[tool.mypy]
+python_version = "3.11"
+files = ["app", "tests"]
+strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+check_untyped_defs = false
+disable_error_code = ["index", "union-attr", "arg-type"]
+
+[[tool.mypy.overrides]]
+module = ["app.__init__", "app.routes.auth"]
+disallow_untyped_defs = false
+check_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["anthropic.*", "google.*", "requests.*", "PIL.*"]
+ignore_missing_imports = true
