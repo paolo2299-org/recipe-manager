@@ -1,144 +1,60 @@
 """Recipe CRUD operations backed by SQLite."""
 
 import json
+import sqlite3
+
+from app.schemas.recipe import RECORD_TYPE_IDEA, RECORD_TYPE_RECIPE, Recipe
 
 from .db import get_db
 
 TABLE = "recipes"
 
 _JSON_FIELDS = ("ingredients", "steps", "tags")
-RECORD_TYPE_RECIPE = "recipe"
-RECORD_TYPE_IDEA = "idea"
-_RECORD_TYPES = {RECORD_TYPE_RECIPE, RECORD_TYPE_IDEA}
+
+__all__ = [
+    "RECORD_TYPE_IDEA",
+    "RECORD_TYPE_RECIPE",
+    "delete_recipe",
+    "get_recipe",
+    "list_recipes",
+    "save_recipe",
+    "update_recipe",
+]
 
 
-def _row_to_dict(row) -> dict:
+def _row_to_recipe(row: sqlite3.Row) -> Recipe:
     data = dict(row)
     for field in _JSON_FIELDS:
-        data[field] = json.loads(data[field]) if data.get(field) else []
+        raw = data.get(field)
+        data[field] = json.loads(raw) if raw else []
     data["id"] = str(data["id"])
-    return data
+    return Recipe.model_validate(data)
 
 
-def _normalize_required_string(value, field_name: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{field_name.replace('_', ' ').capitalize()} is required")
-    return value.strip()
-
-
-def _normalize_optional_string(value) -> str | None:
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        value = str(value)
-    value = value.strip()
-    return value or None
-
-
-def _normalize_record_type(value) -> str:
-    normalized = _normalize_optional_string(value) or RECORD_TYPE_RECIPE
-    if normalized not in _RECORD_TYPES:
-        raise ValueError("Record type must be 'recipe' or 'idea'")
-    return normalized
-
-
-def _normalize_ingredient(item: dict | str) -> dict:
-    if isinstance(item, str):
-        return {
-            "quantity": None,
-            "unit": None,
-            "name": _normalize_required_string(item, "ingredient name"),
-            "notes": None,
-        }
-    if not isinstance(item, dict):
-        raise ValueError("Each ingredient must be a string or object")
-    return {
-        "quantity": _normalize_optional_string(item.get("quantity")),
-        "unit": _normalize_optional_string(item.get("unit")),
-        "name": _normalize_required_string(item.get("name"), "ingredient name"),
-        "notes": _normalize_optional_string(item.get("notes")),
-    }
-
-
-def _normalize_step(item: dict | str, step_number: int) -> dict:
-    if isinstance(item, str):
-        instruction = item
-    elif isinstance(item, dict):
-        instruction = item.get("instruction")
-    else:
-        raise ValueError("Each step must be a string or object")
-    return {
-        "step_number": step_number,
-        "instruction": _normalize_required_string(instruction, "step instruction"),
-    }
-
-
-def normalize_recipe_data(recipe_data: dict) -> dict:
-    """Validate and normalize recipe data for previewing and persistence."""
-    if not isinstance(recipe_data, dict):
-        raise ValueError("Recipe data must be an object")
-
-    record_type = _normalize_record_type(recipe_data.get("record_type"))
-    ingredients = recipe_data.get("ingredients", [])
-    steps = recipe_data.get("steps", [])
-    tags = recipe_data.get("tags", [])
-
-    if not isinstance(ingredients, list):
-        raise ValueError("Ingredients must be a list")
-    if not isinstance(steps, list):
-        raise ValueError("Steps must be a list")
-    if record_type == RECORD_TYPE_RECIPE and not ingredients:
-        raise ValueError("At least one ingredient is required")
-    if record_type == RECORD_TYPE_RECIPE and not steps:
-        raise ValueError("At least one step is required")
-    if not isinstance(tags, list):
-        raise ValueError("Tags must be a list")
-
-    return {
-        "record_type": record_type,
-        "title": _normalize_required_string(recipe_data.get("title"), "title"),
-        "description": _normalize_optional_string(recipe_data.get("description")),
-        "servings": _normalize_optional_string(recipe_data.get("servings")),
-        "prep_time": _normalize_optional_string(recipe_data.get("prep_time")),
-        "cook_time": _normalize_optional_string(recipe_data.get("cook_time")),
-        "total_time": _normalize_optional_string(recipe_data.get("total_time")),
-        "ingredients": [_normalize_ingredient(item) for item in ingredients],
-        "steps": [
-            _normalize_step(item, step_number)
-            for step_number, item in enumerate(steps, start=1)
-        ],
-        "tags": [
-            normalized
-            for normalized in (_normalize_optional_string(tag) for tag in tags)
-            if normalized
-        ],
-    }
-
-
-def _recipe_values(recipe_data: dict) -> tuple:
+def _recipe_values(
+    recipe: Recipe,
+) -> tuple[str, str, str | None, str | None, str | None, str | None, str | None, str, str, str, float | None]:
     from app.calories.calculator import calculate_calories_per_serving
 
-    normalized = normalize_recipe_data(recipe_data)
-    calories_per_serving = calculate_calories_per_serving(normalized)
+    calories_per_serving = calculate_calories_per_serving(recipe)
     return (
-        normalized["record_type"],
-        normalized["title"],
-        normalized["description"],
-        normalized["servings"],
-        normalized["prep_time"],
-        normalized["cook_time"],
-        normalized["total_time"],
-        json.dumps(normalized["ingredients"]),
-        json.dumps(normalized["steps"]),
-        json.dumps(normalized["tags"]),
+        recipe.record_type,
+        recipe.title,
+        recipe.description,
+        recipe.servings,
+        recipe.prep_time,
+        recipe.cook_time,
+        recipe.total_time,
+        json.dumps([ing.model_dump() for ing in recipe.ingredients]),
+        json.dumps([step.model_dump() for step in recipe.steps]),
+        json.dumps(recipe.tags),
         calories_per_serving,
     )
 
 
-def save_recipe(recipe_data: dict, source_type: str, source_ref: str) -> str:
+def save_recipe(recipe: Recipe, source_type: str, source_ref: str) -> str:
     """Insert a recipe row. Returns the new ID as a string."""
     db = get_db()
-    recipe_values = _recipe_values(recipe_data)
     cursor = db.execute(
         f"""
         INSERT INTO {TABLE} (
@@ -146,13 +62,13 @@ def save_recipe(recipe_data: dict, source_type: str, source_ref: str) -> str:
             ingredients, steps, tags, calories_per_serving, source_type, source_ref
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        recipe_values + (source_type, source_ref),
+        _recipe_values(recipe) + (source_type, source_ref),
     )
     db.commit()
     return str(cursor.lastrowid)
 
 
-def get_recipe(recipe_id: str) -> dict | None:
+def get_recipe(recipe_id: str) -> Recipe | None:
     """Fetch a single recipe by ID. Returns None if not found."""
     db = get_db()
     row = db.execute(
@@ -160,20 +76,20 @@ def get_recipe(recipe_id: str) -> dict | None:
     ).fetchone()
     if row is None:
         return None
-    return _row_to_dict(row)
+    return _row_to_recipe(row)
 
 
-def list_recipes(limit: int = 50) -> list[dict]:
+def list_recipes(limit: int = 50) -> list[Recipe]:
     """List recipes ordered by creation date, newest first."""
     db = get_db()
     rows = db.execute(
         f"SELECT * FROM {TABLE} ORDER BY created_at DESC, id DESC LIMIT ?",
         (limit,),
     ).fetchall()
-    return [_row_to_dict(r) for r in rows]
+    return [_row_to_recipe(r) for r in rows]
 
 
-def update_recipe(recipe_id: str, recipe_data: dict) -> None:
+def update_recipe(recipe_id: str, recipe: Recipe) -> None:
     """Update a recipe row in place."""
     db = get_db()
     db.execute(
@@ -193,7 +109,7 @@ def update_recipe(recipe_id: str, recipe_data: dict) -> None:
             updated_at = datetime('now')
         WHERE id = ?
         """,
-        _recipe_values(recipe_data) + (recipe_id,),
+        _recipe_values(recipe) + (recipe_id,),
     )
     db.commit()
 

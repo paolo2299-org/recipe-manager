@@ -1,10 +1,12 @@
 """Shared test fixtures."""
 
 import json
+from typing import Any
 
 import pytest
 
 from app import create_app
+from app.schemas.recipe import Recipe
 
 
 SAMPLE_RECIPE = {
@@ -34,6 +36,11 @@ SAMPLE_RECIPE_DB = {
     "created_at": None,
     "updated_at": None,
 }
+
+
+def make_recipe(**overrides: Any) -> Recipe:
+    """Build a Recipe for tests, overlaying `overrides` on SAMPLE_RECIPE_DB."""
+    return Recipe.model_validate({**SAMPLE_RECIPE_DB, **overrides})
 
 
 def _test_config(tmp_path, **overrides):

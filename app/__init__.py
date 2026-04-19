@@ -9,7 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 load_dotenv()
 
 
-def validate_secret_key_config(app):
+def validate_secret_key_config(app: Flask) -> None:
     if not app.config.get("IS_PRODUCTION") or app.config.get("TESTING"):
         return
 
@@ -20,7 +20,7 @@ def validate_secret_key_config(app):
         )
 
 
-def validate_google_auth_config(app):
+def validate_google_auth_config(app: Flask) -> None:
     if not app.config.get("GOOGLE_AUTH_ENABLED") or app.config.get("TESTING"):
         return
 
@@ -43,9 +43,9 @@ def validate_google_auth_config(app):
         )
 
 
-def create_app(test_config=None):
+def create_app(test_config: dict[str, object] | None = None) -> Flask:
     app = Flask(__name__)
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)  # type: ignore[method-assign]
 
     env = os.environ.get("FLASK_ENV", "development")
     if env == "production":

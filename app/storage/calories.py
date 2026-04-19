@@ -1,11 +1,19 @@
 """Calorie lookup table CRUD operations."""
 
+import sqlite3
+from typing import Any
+
+from pydantic import ValidationError
+
+from app.schemas.calorie import CalorieEntry, MissingCalorie
+from app.schemas.recipe import Recipe
+
 from .db import get_db
 
 TABLE = "calories"
 
 
-def _normalize_key(value) -> str:
+def _normalize_key(value: Any) -> str:
     if value is None:
         return ""
     if not isinstance(value, str):
@@ -13,13 +21,16 @@ def _normalize_key(value) -> str:
     return value.strip().lower()
 
 
-def _row_to_dict(row) -> dict:
-    data = dict(row)
-    data["id"] = str(data["id"])
-    return data
+def _row_to_entry(row: sqlite3.Row) -> CalorieEntry:
+    return CalorieEntry(
+        name=row["name"],
+        unit=row["unit"],
+        reference_quantity=row["reference_quantity"],
+        calories=row["calories"],
+    )
 
 
-def get_calorie(name: str, unit: str | None) -> dict | None:
+def get_calorie(name: str, unit: str | None) -> CalorieEntry | None:
     """Fetch a calorie entry for a (name, unit) pair, case-insensitive."""
     name_key = _normalize_key(name)
     unit_key = _normalize_key(unit)
@@ -30,7 +41,7 @@ def get_calorie(name: str, unit: str | None) -> dict | None:
         f"SELECT * FROM {TABLE} WHERE name_key = ? AND unit_key = ?",
         (name_key, unit_key),
     ).fetchone()
-    return _row_to_dict(row) if row is not None else None
+    return _row_to_entry(row) if row is not None else None
 
 
 def upsert_calorie(
@@ -40,22 +51,25 @@ def upsert_calorie(
     calories: float,
 ) -> None:
     """Insert or update a calorie entry, keyed by the normalized (name, unit)."""
-    if not isinstance(name, str) or not name.strip():
-        raise ValueError("Calorie name is required")
     try:
-        reference_quantity = float(reference_quantity)
-        calories = float(calories)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("Reference quantity and calories must be numeric") from exc
-    if reference_quantity <= 0:
-        raise ValueError("Reference quantity must be greater than zero")
-    if calories < 0:
-        raise ValueError("Calories must be zero or greater")
+        entry = CalorieEntry(
+            name=name,
+            unit=unit,
+            reference_quantity=reference_quantity,
+            calories=calories,
+        )
+    except ValidationError as exc:
+        errors = exc.errors()
+        if errors:
+            msg = str(errors[0].get("msg", ""))
+            prefix = "Value error, "
+            if msg.startswith(prefix):
+                msg = msg[len(prefix):]
+            raise ValueError(msg) from exc
+        raise ValueError(str(exc)) from exc
 
-    trimmed_name = name.strip()
-    trimmed_unit = unit.strip() if isinstance(unit, str) and unit.strip() else None
-    name_key = _normalize_key(trimmed_name)
-    unit_key = _normalize_key(trimmed_unit)
+    name_key = _normalize_key(entry.name)
+    unit_key = _normalize_key(entry.unit)
 
     db = get_db()
     db.execute(
@@ -68,26 +82,28 @@ def upsert_calorie(
             calories = excluded.calories,
             updated_at = datetime('now')
         """,
-        (trimmed_name, trimmed_unit, name_key, unit_key, reference_quantity, calories),
+        (
+            entry.name,
+            entry.unit,
+            name_key,
+            unit_key,
+            entry.reference_quantity,
+            entry.calories,
+        ),
     )
     db.commit()
 
 
-def list_missing_for_recipe(recipe: dict) -> list[dict]:
+def list_missing_for_recipe(recipe: Recipe) -> list[MissingCalorie]:
     """Return the unique (name, unit) pairs in a recipe with no calorie row.
 
     Deduplicated by normalized key, preserving the first-seen casing for display.
     """
-    ingredients = recipe.get("ingredients") or []
     seen_keys: set[tuple[str, str]] = set()
-    missing: list[dict] = []
-    for ingredient in ingredients:
-        if not isinstance(ingredient, dict):
-            continue
-        name = ingredient.get("name")
-        unit = ingredient.get("unit")
-        if not isinstance(name, str) or not name.strip():
-            continue
+    missing: list[MissingCalorie] = []
+    for ingredient in recipe.ingredients:
+        name = ingredient.name
+        unit = ingredient.unit
         name_key = _normalize_key(name)
         unit_key = _normalize_key(unit)
         dedupe_key = (name_key, unit_key)
@@ -95,5 +111,5 @@ def list_missing_for_recipe(recipe: dict) -> list[dict]:
             continue
         seen_keys.add(dedupe_key)
         if get_calorie(name, unit) is None:
-            missing.append({"name": name.strip(), "unit": unit.strip() if isinstance(unit, str) and unit.strip() else None})
+            missing.append(MissingCalorie(name=name, unit=unit))
     return missing

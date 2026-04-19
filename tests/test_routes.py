@@ -2,17 +2,40 @@
 
 import io
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
+from app.schemas.recipe import EditedRecipe, Recipe
+from tests.conftest import SAMPLE_RECIPE, make_recipe
 
-from tests.conftest import SAMPLE_RECIPE, SAMPLE_RECIPE_DB
+
+def _sample_recipe_model() -> Recipe:
+    return Recipe.model_validate(SAMPLE_RECIPE)
+
+
+def _idea_model(**overrides) -> Recipe:
+    base = {
+        "id": "idea-1",
+        "record_type": "idea",
+        "title": "Chicken shawarma bowls",
+        "description": "Try with pickled onions.",
+        "servings": None,
+        "prep_time": None,
+        "cook_time": None,
+        "total_time": None,
+        "ingredients": [],
+        "steps": [],
+        "tags": ["British", "Thai"],
+        "source_type": "manual",
+        "source_ref": "",
+    }
+    base.update(overrides)
+    return Recipe.model_validate(base)
 
 
 class TestIndex:
     @patch("app.routes.recipes.list_recipes")
     def test_index_renders(self, mock_list, client):
-        mock_list.return_value = [SAMPLE_RECIPE_DB]
+        mock_list.return_value = [make_recipe()]
 
         response = client.get("/")
 
@@ -42,7 +65,7 @@ class TestIndex:
 class TestDetail:
     @patch("app.routes.recipes.get_recipe")
     def test_detail_found(self, mock_get, client):
-        mock_get.return_value = SAMPLE_RECIPE_DB
+        mock_get.return_value = make_recipe()
 
         response = client.get("/recipes/abc123")
 
@@ -61,23 +84,7 @@ class TestDetail:
 
     @patch("app.routes.recipes.get_recipe")
     def test_detail_for_idea_shows_placeholders(self, mock_get, client):
-        mock_get.return_value = {
-            "id": "idea-1",
-            "record_type": "idea",
-            "title": "Chicken shawarma bowls",
-            "description": None,
-            "servings": None,
-            "prep_time": None,
-            "cook_time": None,
-            "total_time": None,
-            "ingredients": [],
-            "steps": [],
-            "tags": ["dinner"],
-            "source_type": "manual",
-            "source_ref": "",
-            "created_at": None,
-            "updated_at": None,
-        }
+        mock_get.return_value = _idea_model(tags=["dinner"])
 
         response = client.get("/recipes/idea-1")
 
@@ -104,7 +111,7 @@ class TestAdd:
 class TestExtractUrl:
     @patch("app.routes.recipes.extract_from_url")
     def test_success(self, mock_extract, client):
-        mock_extract.return_value = SAMPLE_RECIPE
+        mock_extract.return_value = _sample_recipe_model()
 
         response = client.post(
             "/recipes/extract/url",
@@ -139,7 +146,7 @@ class TestExtractUrl:
 class TestExtractImage:
     @patch("app.routes.recipes.extract_from_image")
     def test_success(self, mock_extract, client):
-        mock_extract.return_value = SAMPLE_RECIPE
+        mock_extract.return_value = _sample_recipe_model()
 
         response = client.post(
             "/recipes/extract/image",
@@ -191,6 +198,9 @@ class TestSave:
         assert response.status_code == 200
         assert "HX-Redirect" in response.headers
         assert "/recipes/new-id" in response.headers["HX-Redirect"]
+        mock_save.assert_called_once_with(
+            _sample_recipe_model(), "url", "https://example.com"
+        )
 
     def test_missing_recipe_json(self, client):
         response = client.post("/recipes/save", data={})
@@ -231,18 +241,15 @@ class TestCreateIdea:
 
         assert response.status_code == 200
         assert response.headers["HX-Redirect"] == "/recipes/idea-id"
-        mock_save.assert_called_once_with(
-            {
-                "record_type": "idea",
-                "title": "Gochujang noodles",
-                "description": "Try with sesame cucumbers.",
-                "ingredients": [],
-                "steps": [],
-                "tags": ["British", "Thai"],
-            },
-            "manual",
-            "",
+        expected = Recipe(
+            record_type="idea",
+            title="Gochujang noodles",
+            description="Try with sesame cucumbers.",
+            ingredients=[],
+            steps=[],
+            tags=["British", "Thai"],
         )
+        mock_save.assert_called_once_with(expected, "manual", "")
 
     def test_missing_title_shows_error(self, client):
         response = client.post(
@@ -268,23 +275,7 @@ class TestCreateIdea:
 class TestEditIdea:
     @patch("app.routes.recipes.get_recipe")
     def test_edit_page_renders_for_idea(self, mock_get, client):
-        mock_get.return_value = {
-            "id": "idea-1",
-            "record_type": "idea",
-            "title": "Chicken shawarma bowls",
-            "description": "Try with pickled onions.",
-            "servings": None,
-            "prep_time": None,
-            "cook_time": None,
-            "total_time": None,
-            "ingredients": [],
-            "steps": [],
-            "tags": ["British", "Thai"],
-            "source_type": "manual",
-            "source_ref": "",
-            "created_at": None,
-            "updated_at": None,
-        }
+        mock_get.return_value = _idea_model(tags=["British", "Thai"])
 
         response = client.get("/recipes/idea-1/edit")
 
@@ -296,7 +287,7 @@ class TestEditIdea:
 
     @patch("app.routes.recipes.get_recipe")
     def test_edit_page_404_for_non_idea(self, mock_get, client):
-        mock_get.return_value = SAMPLE_RECIPE_DB
+        mock_get.return_value = make_recipe()
 
         response = client.get("/recipes/abc123/edit")
 
@@ -305,23 +296,8 @@ class TestEditIdea:
     @patch("app.routes.recipes.update_recipe")
     @patch("app.routes.recipes.get_recipe")
     def test_update_redirects_to_detail(self, mock_get, mock_update, client):
-        mock_get.return_value = {
-            "id": "idea-1",
-            "record_type": "idea",
-            "title": "Chicken shawarma bowls",
-            "description": "Try with pickled onions.",
-            "servings": None,
-            "prep_time": None,
-            "cook_time": None,
-            "total_time": None,
-            "ingredients": [],
-            "steps": [],
-            "tags": ["British"],
-            "source_type": "manual",
-            "source_ref": "",
-            "created_at": None,
-            "updated_at": None,
-        }
+        initial = _idea_model(tags=["British"])
+        mock_get.return_value = initial
 
         response = client.post(
             "/recipes/idea-1/edit",
@@ -335,47 +311,19 @@ class TestEditIdea:
 
         assert response.status_code == 302
         assert response.headers["Location"] == "/recipes/idea-1"
-        mock_update.assert_called_once_with(
-            "idea-1",
-            {
-                "id": "idea-1",
-                "record_type": "idea",
+        expected = initial.model_copy(
+            update={
                 "title": "Crispy chicken shawarma bowls",
                 "description": "Add garlicky yogurt.",
-                "servings": None,
-                "prep_time": None,
-                "cook_time": None,
-                "total_time": None,
-                "ingredients": [],
-                "steps": [],
                 "tags": ["British", "Thai"],
-                "source_type": "manual",
-                "source_ref": "",
-                "created_at": None,
-                "updated_at": None,
-            },
+            }
         )
+        mock_update.assert_called_once_with("idea-1", expected)
 
     @patch("app.routes.recipes.update_recipe")
     @patch("app.routes.recipes.get_recipe")
     def test_update_re_renders_on_error(self, mock_get, mock_update, client):
-        mock_get.return_value = {
-            "id": "idea-1",
-            "record_type": "idea",
-            "title": "Chicken shawarma bowls",
-            "description": None,
-            "servings": None,
-            "prep_time": None,
-            "cook_time": None,
-            "total_time": None,
-            "ingredients": [],
-            "steps": [],
-            "tags": ["British"],
-            "source_type": "manual",
-            "source_ref": "",
-            "created_at": None,
-            "updated_at": None,
-        }
+        mock_get.return_value = _idea_model(description=None, tags=["British"])
         mock_update.side_effect = ValueError("Title is required")
 
         response = client.post(
@@ -403,12 +351,14 @@ class TestEditPreview:
     @patch("app.routes.recipes.edit_recipe")
     @patch("app.routes.recipes.get_recipe")
     def test_success(self, mock_get, mock_edit, client):
-        mock_get.return_value = SAMPLE_RECIPE_DB
-        mock_edit.return_value = {
-            "recipe": {**SAMPLE_RECIPE, "title": "Peruvian Pancakes"},
-            "change_summary": "Changed the recipe title.",
-            "warnings": ["Servings were left unchanged."],
-        }
+        mock_get.return_value = make_recipe()
+        mock_edit.return_value = EditedRecipe.model_validate(
+            {
+                "recipe": {**SAMPLE_RECIPE, "title": "Peruvian Pancakes"},
+                "change_summary": "Changed the recipe title.",
+                "warnings": ["Servings were left unchanged."],
+            }
+        )
 
         response = client.post(
             "/recipes/abc123/edit-preview",
@@ -423,7 +373,7 @@ class TestEditPreview:
 
     @patch("app.routes.recipes.get_recipe")
     def test_missing_instruction(self, mock_get, client):
-        mock_get.return_value = SAMPLE_RECIPE_DB
+        mock_get.return_value = make_recipe()
 
         response = client.post("/recipes/abc123/edit-preview", data={"instruction": ""})
 
@@ -435,7 +385,7 @@ class TestEditPreview:
     def test_model_error(self, mock_get, mock_edit, client):
         from app.extraction.claude import ExtractionError
 
-        mock_get.return_value = SAMPLE_RECIPE_DB
+        mock_get.return_value = make_recipe()
         mock_edit.side_effect = ExtractionError("Could not update recipe")
 
         response = client.post(
@@ -448,23 +398,7 @@ class TestEditPreview:
 
     @patch("app.routes.recipes.get_recipe")
     def test_ideas_cannot_use_ai_edit_preview(self, mock_get, client):
-        mock_get.return_value = {
-            "id": "idea-1",
-            "record_type": "idea",
-            "title": "Chicken shawarma bowls",
-            "description": None,
-            "servings": None,
-            "prep_time": None,
-            "cook_time": None,
-            "total_time": None,
-            "ingredients": [],
-            "steps": [],
-            "tags": ["dinner"],
-            "source_type": "manual",
-            "source_ref": "",
-            "created_at": None,
-            "updated_at": None,
-        }
+        mock_get.return_value = _idea_model(tags=["dinner"])
 
         response = client.post(
             "/recipes/idea-1/edit-preview",
@@ -478,7 +412,7 @@ class TestApplyEdit:
     @patch("app.routes.recipes.update_recipe")
     @patch("app.routes.recipes.get_recipe")
     def test_success_redirects(self, mock_get, mock_update, client):
-        mock_get.return_value = SAMPLE_RECIPE_DB
+        mock_get.return_value = make_recipe()
 
         response = client.post(
             "/recipes/abc123/apply-edit",
@@ -487,11 +421,11 @@ class TestApplyEdit:
 
         assert response.status_code == 200
         assert response.headers["HX-Redirect"] == "/recipes/abc123"
-        mock_update.assert_called_once_with("abc123", SAMPLE_RECIPE)
+        mock_update.assert_called_once_with("abc123", _sample_recipe_model())
 
     @patch("app.routes.recipes.get_recipe")
     def test_missing_recipe_json(self, mock_get, client):
-        mock_get.return_value = SAMPLE_RECIPE_DB
+        mock_get.return_value = make_recipe()
 
         response = client.post("/recipes/abc123/apply-edit", data={})
 

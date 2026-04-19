@@ -1,10 +1,12 @@
 """Per-serving calorie calculation for recipes."""
 
+from typing import Any
+
+from app.schemas.recipe import RECORD_TYPE_IDEA, Recipe
 from app.storage.calories import get_calorie
-from app.storage.recipes import RECORD_TYPE_IDEA
 
 
-def parse_quantity(value) -> float | None:
+def parse_quantity(value: Any) -> float | None:
     """Parse a quantity string into a float.
 
     Accepts integers, decimals, simple fractions ("1/2"), and mixed fractions
@@ -12,9 +14,9 @@ def parse_quantity(value) -> float | None:
     """
     if value is None:
         return None
+    if isinstance(value, bool):
+        return None
     if isinstance(value, (int, float)):
-        if isinstance(value, bool):
-            return None
         return float(value)
     if not isinstance(value, str):
         return None
@@ -48,32 +50,28 @@ def parse_quantity(value) -> float | None:
     return None
 
 
-def calculate_calories_per_serving(recipe: dict) -> float | None:
+def calculate_calories_per_serving(recipe: Recipe) -> float | None:
     """Compute the per-serving calorie count, or None if the data is incomplete."""
-    if recipe.get("record_type") == RECORD_TYPE_IDEA:
+    if recipe.record_type == RECORD_TYPE_IDEA:
         return None
 
-    ingredients = recipe.get("ingredients") or []
-    if not ingredients:
+    if not recipe.ingredients:
         return None
 
-    servings = parse_quantity(recipe.get("servings"))
+    servings = parse_quantity(recipe.servings)
     if servings is None or servings <= 0:
         return None
 
     total = 0.0
-    for ingredient in ingredients:
-        if not isinstance(ingredient, dict):
-            return None
-        quantity = parse_quantity(ingredient.get("quantity"))
+    for ingredient in recipe.ingredients:
+        quantity = parse_quantity(ingredient.quantity)
         if quantity is None:
             return None
-        calorie_row = get_calorie(ingredient.get("name"), ingredient.get("unit"))
+        calorie_row = get_calorie(ingredient.name, ingredient.unit)
         if calorie_row is None:
             return None
-        reference = calorie_row["reference_quantity"]
-        if not reference:
+        if not calorie_row.reference_quantity:
             return None
-        total += quantity / reference * calorie_row["calories"]
+        total += quantity / calorie_row.reference_quantity * calorie_row.calories
 
     return round(total / servings, 1)

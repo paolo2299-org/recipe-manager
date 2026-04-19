@@ -16,6 +16,9 @@ run:
 test:
 	$(COMPOSE) run --rm test
 
+typecheck:
+	mypy app tests
+
 down:
 	$(COMPOSE) down --remove-orphans
 
@@ -32,4 +35,4 @@ prod-stop:
 prod-restart:
 	$(COMPOSE_PROD) restart recipe-manager
 
-.PHONY: dev build run test down shell prod-start prod-stop prod-restart
+.PHONY: dev build run test typecheck down shell prod-start prod-stop prod-restart

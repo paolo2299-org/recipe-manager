@@ -10,6 +10,7 @@ from app.extraction.claude import (
     extract_from_image,
     extract_from_url,
 )
+from app.schemas.recipe import Recipe
 
 from tests.conftest import SAMPLE_RECIPE
 
@@ -68,7 +69,7 @@ class TestExtractFromUrl:
 
         result = extract_from_url("https://example.com/recipe")
 
-        assert result == SAMPLE_RECIPE
+        assert result == Recipe.model_validate(SAMPLE_RECIPE)
         mock_jina.assert_called_once_with("https://example.com/recipe")
         mock_claude.assert_called_once()
 
@@ -98,7 +99,7 @@ class TestExtractFromImage:
 
         result = extract_from_image(b"fake-image-bytes", "recipe.jpg")
 
-        assert result == SAMPLE_RECIPE
+        assert result == Recipe.model_validate(SAMPLE_RECIPE)
         mock_prepare.assert_called_once_with(b"fake-image-bytes", "recipe.jpg")
         mock_claude.assert_called_once()
         # Verify the image data was passed in the message
