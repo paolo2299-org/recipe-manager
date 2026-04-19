@@ -25,6 +25,16 @@
 </div>
 {% endif %}
 
+{% if recipe.record_type != 'idea' %}
+<p>
+    {% if recipe.calories_per_serving is not none %}
+    <small><strong>Calories per serving:</strong> {{ recipe.calories_per_serving }}</small>
+    {% else %}
+    <a href="{{ url_for('recipes.edit_calories', recipe_id=recipe.id) }}">Add calorie information</a>
+    {% endif %}
+</p>
+{% endif %}
+
 {% if recipe.tags %}
 <p>
     {% for tag in recipe.tags %}

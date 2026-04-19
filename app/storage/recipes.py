@@ -116,7 +116,10 @@ def normalize_recipe_data(recipe_data: dict) -> dict:
 
 
 def _recipe_values(recipe_data: dict) -> tuple:
+    from app.calories.calculator import calculate_calories_per_serving
+
     normalized = normalize_recipe_data(recipe_data)
+    calories_per_serving = calculate_calories_per_serving(normalized)
     return (
         normalized["record_type"],
         normalized["title"],
@@ -128,6 +131,7 @@ def _recipe_values(recipe_data: dict) -> tuple:
         json.dumps(normalized["ingredients"]),
         json.dumps(normalized["steps"]),
         json.dumps(normalized["tags"]),
+        calories_per_serving,
     )
 
 
@@ -139,8 +143,8 @@ def save_recipe(recipe_data: dict, source_type: str, source_ref: str) -> str:
         f"""
         INSERT INTO {TABLE} (
             record_type, title, description, servings, prep_time, cook_time, total_time,
-            ingredients, steps, tags, source_type, source_ref
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ingredients, steps, tags, calories_per_serving, source_type, source_ref
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         recipe_values + (source_type, source_ref),
     )
@@ -185,6 +189,7 @@ def update_recipe(recipe_id: str, recipe_data: dict) -> None:
             ingredients = ?,
             steps = ?,
             tags = ?,
+            calories_per_serving = ?,
             updated_at = datetime('now')
         WHERE id = ?
         """,
