@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.calories.negligible import is_negligible
 from app.schemas.calorie import CalorieEntry, MissingCalorie
 from app.schemas.recipe import Recipe
 
@@ -104,6 +105,8 @@ def list_missing_for_recipe(recipe: Recipe) -> list[MissingCalorie]:
     for ingredient in recipe.ingredients:
         name = ingredient.name
         unit = ingredient.unit
+        if is_negligible(name):
+            continue
         name_key = _normalize_key(name)
         unit_key = _normalize_key(unit)
         dedupe_key = (name_key, unit_key)

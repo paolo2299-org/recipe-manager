@@ -88,11 +88,11 @@ class TestCalculateCaloriesPerServing:
         assert calculate_calories_per_serving(recipe) == 10.8
 
     def test_unparseable_quantity_blocks(self, ctx):
-        upsert_calorie("salt", "tsp", 1, 0)
+        upsert_calorie("cumin", "tsp", 1, 8)
         recipe = _recipe(
             "recipe",
             "2",
-            [{"quantity": "a pinch", "unit": "tsp", "name": "salt"}],
+            [{"quantity": "a pinch", "unit": "tsp", "name": "cumin"}],
         )
         assert calculate_calories_per_serving(recipe) is None
 
@@ -129,3 +129,53 @@ class TestCalculateCaloriesPerServing:
             [{"quantity": "100", "unit": "g", "name": "flour"}],
         )
         assert calculate_calories_per_serving(recipe) is None
+
+    def test_negligible_ingredients_contribute_zero(self, ctx):
+        upsert_calorie("flour", "g", 100, 364)
+        recipe = _recipe(
+            "recipe",
+            "2",
+            [
+                {"quantity": "200", "unit": "g", "name": "flour"},
+                {"quantity": "1", "unit": "tsp", "name": "salt"},
+                {"quantity": "500", "unit": "ml", "name": "water"},
+            ],
+        )
+        # Only flour contributes: (200/100 * 364) / 2 = 364.0
+        assert calculate_calories_per_serving(recipe) == 364.0
+
+    def test_negligible_ingredient_with_unparseable_quantity(self, ctx):
+        upsert_calorie("flour", "g", 100, 364)
+        recipe = _recipe(
+            "recipe",
+            "2",
+            [
+                {"quantity": "200", "unit": "g", "name": "flour"},
+                {"quantity": "a pinch", "unit": None, "name": "salt"},
+            ],
+        )
+        assert calculate_calories_per_serving(recipe) == 364.0
+
+    def test_negligible_ingredient_name_is_case_insensitive(self, ctx):
+        upsert_calorie("flour", "g", 100, 364)
+        recipe = _recipe(
+            "recipe",
+            "2",
+            [
+                {"quantity": "200", "unit": "g", "name": "flour"},
+                {"quantity": "1", "unit": "tsp", "name": "SALT"},
+                {"quantity": "1", "unit": "tbsp", "name": "  Parsley  "},
+            ],
+        )
+        assert calculate_calories_per_serving(recipe) == 364.0
+
+    def test_recipe_with_only_negligible_ingredients_returns_zero(self, ctx):
+        recipe = _recipe(
+            "recipe",
+            "2",
+            [
+                {"quantity": "500", "unit": "ml", "name": "water"},
+                {"quantity": "1", "unit": "tsp", "name": "salt"},
+            ],
+        )
+        assert calculate_calories_per_serving(recipe) == 0.0
