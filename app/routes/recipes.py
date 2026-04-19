@@ -34,6 +34,7 @@ from app.schemas.recipe import ALLOWED_RECIPE_TAGS, Recipe
 from app.storage.calories import (
     list_missing_for_recipe,
     list_unparseable_for_recipe,
+    servings_needs_fix,
     upsert_calorie,
 )
 from app.storage.recipes import (
@@ -137,7 +138,7 @@ def edit_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
     recipe = get_recipe(recipe_id)
     if recipe is None or recipe.record_type == RECORD_TYPE_IDEA:
         abort(404)
-    if list_unparseable_for_recipe(recipe):
+    if servings_needs_fix(recipe) or list_unparseable_for_recipe(recipe):
         return redirect(
             url_for("recipes.edit_ingredient_quantities", recipe_id=recipe_id)
         )
@@ -158,12 +159,14 @@ def edit_ingredient_quantities(recipe_id: str) -> Response | WerkzeugResponse | 
     if recipe is None or recipe.record_type == RECORD_TYPE_IDEA:
         abort(404)
     unparseable = list_unparseable_for_recipe(recipe)
-    if not unparseable:
+    needs_servings = servings_needs_fix(recipe)
+    if not unparseable and not needs_servings:
         return redirect(url_for("recipes.edit_calories", recipe_id=recipe_id))
     return render_template(
         "edit_ingredient_quantities.html",
         recipe=recipe,
         unparseable=unparseable,
+        needs_servings=needs_servings,
         error=None,
     )
 
@@ -173,6 +176,15 @@ def save_ingredient_quantities(recipe_id: str) -> Response | WerkzeugResponse | 
     recipe = get_recipe(recipe_id)
     if recipe is None or recipe.record_type == RECORD_TYPE_IDEA:
         abort(404)
+
+    def _render_error(error: str) -> str:
+        return render_template(
+            "edit_ingredient_quantities.html",
+            recipe=recipe,
+            unparseable=list_unparseable_for_recipe(recipe),
+            needs_servings=servings_needs_fix(recipe),
+            error=error,
+        )
 
     try:
         form = IngredientQuantityForm.from_form(request.form)
@@ -184,38 +196,20 @@ def save_ingredient_quantities(recipe_id: str) -> Response | WerkzeugResponse | 
             updated_ingredients[index] = updated_ingredients[index].model_copy(
                 update={"quantity": entry["quantity"], "unit": entry["unit"]}
             )
-        update_recipe(
-            recipe_id,
-            recipe.model_copy(update={"ingredients": updated_ingredients}),
-        )
+        update_fields: dict[str, object] = {"ingredients": updated_ingredients}
+        if form.servings is not None:
+            update_fields["servings"] = form.servings
+        update_recipe(recipe_id, recipe.model_copy(update=update_fields))
         return redirect(url_for("recipes.edit_calories", recipe_id=recipe_id))
     except ValidationError as e:
         logger.info("Saving ingredient quantities failed validation")
-        unparseable = list_unparseable_for_recipe(recipe)
-        return render_template(
-            "edit_ingredient_quantities.html",
-            recipe=recipe,
-            unparseable=unparseable,
-            error=first_error_msg(e),
-        )
+        return _render_error(first_error_msg(e))
     except ValueError as e:
         logger.info("Saving ingredient quantities failed validation")
-        unparseable = list_unparseable_for_recipe(recipe)
-        return render_template(
-            "edit_ingredient_quantities.html",
-            recipe=recipe,
-            unparseable=unparseable,
-            error=str(e),
-        )
+        return _render_error(str(e))
     except Exception as e:
         logger.exception("Saving ingredient quantities failed")
-        unparseable = list_unparseable_for_recipe(recipe)
-        return render_template(
-            "edit_ingredient_quantities.html",
-            recipe=recipe,
-            unparseable=unparseable,
-            error=str(e),
-        )
+        return _render_error(str(e))
 
 
 @bp.route("/recipes/<recipe_id>/calories/edit", methods=["POST"])

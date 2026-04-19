@@ -8,6 +8,7 @@ from app.storage.calories import (
     get_calorie,
     list_missing_for_recipe,
     list_unparseable_for_recipe,
+    servings_needs_fix,
     upsert_calorie,
 )
 
@@ -153,3 +154,47 @@ class TestListUnparseableForRecipe:
             ]
         )
         assert list_unparseable_for_recipe(recipe) == []
+
+
+class TestServingsNeedsFix:
+    def _recipe(self, servings):
+        return Recipe.model_validate(
+            {
+                "title": "Test",
+                "servings": servings,
+                "ingredients": [{"quantity": "100", "unit": "g", "name": "flour"}],
+                "steps": [{"step_number": 1, "instruction": "Mix."}],
+                "tags": [],
+            }
+        )
+
+    def test_needs_fix_when_none(self):
+        assert servings_needs_fix(self._recipe(None)) is True
+
+    def test_needs_fix_for_range(self):
+        assert servings_needs_fix(self._recipe("4-6")) is True
+
+    def test_needs_fix_for_non_numeric(self):
+        assert servings_needs_fix(self._recipe("Serves 4")) is True
+
+    def test_needs_fix_for_zero(self):
+        assert servings_needs_fix(self._recipe("0")) is True
+
+    def test_ok_for_integer(self):
+        assert servings_needs_fix(self._recipe("4")) is False
+
+    def test_ok_for_mixed_fraction(self):
+        assert servings_needs_fix(self._recipe("1 1/2")) is False
+
+    def test_ideas_never_need_fix(self):
+        idea = Recipe.model_validate(
+            {
+                "record_type": "idea",
+                "title": "Test idea",
+                "servings": None,
+                "ingredients": [],
+                "steps": [],
+                "tags": [],
+            }
+        )
+        assert servings_needs_fix(idea) is False

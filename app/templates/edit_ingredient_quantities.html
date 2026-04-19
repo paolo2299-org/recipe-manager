@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Fix ingredient amounts - {{ recipe.title }}{% endblock %}
+{% block title %}Fix recipe amounts - {{ recipe.title }}{% endblock %}
 {% block content %}
-<h1>Fix ingredient amounts</h1>
+<h1>Fix recipe amounts</h1>
 <p><small>For <strong>{{ recipe.title }}</strong></small></p>
 
 {% if error %}
@@ -11,11 +11,22 @@
 {% endif %}
 
 <p>
-    These ingredients don't have an amount we can use to calculate calories.
-    Enter a number (e.g. <code>3</code>, <code>1/2</code>, or <code>1 1/2</code>) and, if it helps, a unit.
+    Some values on this recipe can't be used to calculate calories.
+    Enter a number (e.g. <code>3</code>, <code>1/2</code>, or <code>1 1/2</code>) for each.
 </p>
 
 <form action="{{ url_for('recipes.save_ingredient_quantities', recipe_id=recipe.id) }}" method="post">
+    {% if needs_servings %}
+    <fieldset>
+        <legend><strong>Servings</strong></legend>
+        <p><small>Currently: {{ recipe.servings or '—' }}</small></p>
+        <label>
+            Number of servings
+            <input type="text" name="servings" required placeholder="e.g. 4">
+        </label>
+    </fieldset>
+    {% endif %}
+
     {% for index, ingredient in unparseable %}
     <fieldset>
         <legend><strong>{{ ingredient.name }}</strong></legend>

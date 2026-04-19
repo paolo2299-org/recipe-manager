@@ -128,13 +128,16 @@ class CalorieBatchForm(BaseModel):
 
 
 class IngredientQuantityForm(BaseModel):
-    """Form model for editing ingredient quantities whose original values can't be parsed.
+    """Form model for fixing recipe amounts that the calorie calculator can't use.
 
-    Incoming form fields are parallel lists (index[], quantity[], unit[]). Every
-    quantity must parse via the calorie calculator; blank units become None.
+    Incoming form fields are parallel lists (index[], quantity[], unit[]) for
+    ingredient fixes, plus an optional single `servings` field. Every submitted
+    quantity and the servings value (if present) must parse via the calorie
+    calculator; blank units become None.
     """
 
     entries: list[dict[str, Any]]
+    servings: str | None = None
 
     model_config = ConfigDict(extra="ignore")
 
@@ -165,9 +168,23 @@ class IngredientQuantityForm(BaseModel):
                     "unit": unit_trimmed or None,
                 }
             )
-        if not entries:
-            raise ValueError("No ingredient quantities submitted")
-        return cls(entries=entries)
+
+        servings_raw = form.get("servings", "")
+        servings_trimmed = servings_raw.strip() if isinstance(servings_raw, str) else ""
+        servings: str | None
+        if servings_trimmed:
+            parsed_servings = parse_quantity(servings_trimmed)
+            if parsed_servings is None or parsed_servings <= 0:
+                raise ValueError(
+                    f"Servings '{servings_trimmed}' can't be parsed as a positive number"
+                )
+            servings = servings_trimmed
+        else:
+            servings = None
+
+        if not entries and servings is None:
+            raise ValueError("Nothing to save")
+        return cls(entries=entries, servings=servings)
 
 
 class ExtractUrlForm(BaseModel):
