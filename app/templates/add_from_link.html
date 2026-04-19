@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Add Recipe from Link - Recipe Manager{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('recipes.add') }}">&larr; Back</a></p>
+<h1>Add Recipe from Link</h1>
+
+<form hx-post="{{ url_for('recipes.extract_url') }}"
+      hx-target="#result"
+      hx-indicator="#loading"
+      hx-disabled-elt="button[type='submit']">
+    <fieldset role="group">
+        <input type="url" name="url" placeholder="https://example.com/recipe" required>
+        <button type="submit">Extract</button>
+    </fieldset>
+</form>
+
+<div id="loading" class="htmx-indicator">
+    <article aria-busy="true">
+        Extracting recipe with AI... this may take 10-15 seconds.
+    </article>
+</div>
+
+<div id="result"></div>
+{% endblock %}

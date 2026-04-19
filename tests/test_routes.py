@@ -97,13 +97,33 @@ class TestDetail:
 
 
 class TestAdd:
-    def test_add_page_renders(self, client):
+    def test_add_hub_renders(self, client):
         response = client.get("/recipes/add")
 
         assert response.status_code == 200
-        assert b"From URL" in response.data
-        assert b"From Image" in response.data
-        assert b"Add Recipe Idea" in response.data
+        assert b'href="/recipes/add/from-link"' in response.data
+        assert b'href="/recipes/add/from-photo"' in response.data
+        assert b'href="/recipes/add/idea"' in response.data
+
+    def test_add_from_link_page_renders(self, client):
+        response = client.get("/recipes/add/from-link")
+
+        assert response.status_code == 200
+        assert b'hx-post="/recipes/extract/url"' in response.data
+        assert b'name="url"' in response.data
+
+    def test_add_from_photo_page_renders(self, client):
+        response = client.get("/recipes/add/from-photo")
+
+        assert response.status_code == 200
+        assert b'hx-post="/recipes/extract/image"' in response.data
+        assert b'name="image"' in response.data
+
+    def test_add_idea_page_renders(self, client):
+        response = client.get("/recipes/add/idea")
+
+        assert response.status_code == 200
+        assert b'hx-post="/recipes/create-idea"' in response.data
         assert b"Cuisine Tags" in response.data
         assert b"British" in response.data
 

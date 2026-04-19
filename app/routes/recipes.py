@@ -251,8 +251,23 @@ def save_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
 
 @bp.route("/recipes/add")
 def add() -> str:
+    return render_template("add.html")
+
+
+@bp.route("/recipes/add/from-link")
+def add_from_link() -> str:
+    return render_template("add_from_link.html")
+
+
+@bp.route("/recipes/add/from-photo")
+def add_from_photo() -> str:
+    return render_template("add_from_photo.html")
+
+
+@bp.route("/recipes/add/idea")
+def add_idea() -> str:
     return render_template(
-        "add.html",
+        "add_idea.html",
         allowed_recipe_tags=ALLOWED_RECIPE_TAGS,
         selected_idea_tags=[],
     )
