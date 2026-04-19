@@ -2,7 +2,6 @@
 
 import json
 import logging
-from typing import Any
 
 from flask import (
     Blueprint,
@@ -30,14 +29,13 @@ from app.schemas.forms import (
     IdeaForm,
     first_error_msg,
 )
-from app.schemas.recipe import ALLOWED_RECIPE_TAGS
+from app.schemas.recipe import ALLOWED_RECIPE_TAGS, Recipe
 from app.storage.calories import list_missing_for_recipe, upsert_calorie
 from app.storage.recipes import (
     RECORD_TYPE_IDEA,
     delete_recipe,
     get_recipe,
     list_recipes,
-    normalize_recipe_data,
     save_recipe,
     update_recipe,
 )
@@ -47,9 +45,9 @@ logger = logging.getLogger(__name__)
 bp = Blueprint("recipes", __name__)
 
 
-def _get_idea_or_404(recipe_id: str) -> dict[str, Any]:
+def _get_idea_or_404(recipe_id: str) -> Recipe:
     recipe = get_recipe(recipe_id)
-    if recipe is None or recipe.get("record_type") != RECORD_TYPE_IDEA:
+    if recipe is None or recipe.record_type != RECORD_TYPE_IDEA:
         abort(404)
     return recipe
 
@@ -82,7 +80,7 @@ def edit_idea(recipe_id: str) -> str:
         "edit_idea.html",
         recipe=recipe,
         allowed_recipe_tags=ALLOWED_RECIPE_TAGS,
-        selected_idea_tags=recipe.get("tags", []),
+        selected_idea_tags=recipe.tags,
         error=None,
     )
 
@@ -96,23 +94,22 @@ def update_idea(recipe_id: str) -> Response | WerkzeugResponse | str:
     try:
         form = IdeaForm.from_form(request.form)
         selected_idea_tags = form.tags
-        updated_idea = {
-            **recipe,
-            "title": form.title,
-            "description": form.description,
-            "tags": form.tags,
-        }
-        update_recipe(recipe_id, updated_idea)
+        updated = recipe.model_copy(
+            update={
+                "title": form.title,
+                "description": form.description,
+                "tags": form.tags,
+            }
+        )
+        update_recipe(recipe_id, updated)
         return redirect(url_for("recipes.detail", recipe_id=recipe_id))
     except ValidationError as e:
         logger.info("Idea update failed validation")
         return render_template(
             "edit_idea.html",
-            recipe={
-                **recipe,
-                "title": submitted_title,
-                "description": submitted_description,
-            },
+            recipe=recipe.model_copy(
+                update={"title": submitted_title, "description": submitted_description}
+            ),
             allowed_recipe_tags=ALLOWED_RECIPE_TAGS,
             selected_idea_tags=selected_idea_tags,
             error=first_error_msg(e),
@@ -121,11 +118,9 @@ def update_idea(recipe_id: str) -> Response | WerkzeugResponse | str:
         logger.exception("Idea update failed")
         return render_template(
             "edit_idea.html",
-            recipe={
-                **recipe,
-                "title": submitted_title,
-                "description": submitted_description,
-            },
+            recipe=recipe.model_copy(
+                update={"title": submitted_title, "description": submitted_description}
+            ),
             allowed_recipe_tags=ALLOWED_RECIPE_TAGS,
             selected_idea_tags=selected_idea_tags,
             error=str(e),
@@ -135,7 +130,7 @@ def update_idea(recipe_id: str) -> Response | WerkzeugResponse | str:
 @bp.route("/recipes/<recipe_id>/calories/edit")
 def edit_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
     recipe = get_recipe(recipe_id)
-    if recipe is None or recipe.get("record_type") == RECORD_TYPE_IDEA:
+    if recipe is None or recipe.record_type == RECORD_TYPE_IDEA:
         abort(404)
     missing = list_missing_for_recipe(recipe)
     if not missing:
@@ -151,7 +146,7 @@ def edit_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
 @bp.route("/recipes/<recipe_id>/calories/edit", methods=["POST"])
 def save_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
     recipe = get_recipe(recipe_id)
-    if recipe is None or recipe.get("record_type") == RECORD_TYPE_IDEA:
+    if recipe is None or recipe.record_type == RECORD_TYPE_IDEA:
         abort(404)
 
     try:
@@ -202,12 +197,11 @@ def extract_url() -> str:
         return render_template("partials/extraction_error.html", error=first_error_msg(e))
 
     try:
-        recipe_data = extract_from_url(form.url)
-        recipe_json = json.dumps(recipe_data)
+        recipe = extract_from_url(form.url)
         return render_template(
             "partials/extraction_result.html",
-            recipe=recipe_data,
-            recipe_json=recipe_json,
+            recipe=recipe,
+            recipe_json=recipe.model_dump_json(),
             source_type="url",
             source_ref=form.url,
         )
@@ -224,12 +218,11 @@ def extract_image() -> str:
     filename = file.filename
     try:
         file_bytes = file.read()
-        recipe_data = extract_from_image(file_bytes, filename)
-        recipe_json = json.dumps(recipe_data)
+        recipe = extract_from_image(file_bytes, filename)
         return render_template(
             "partials/extraction_result.html",
-            recipe=recipe_data,
-            recipe_json=recipe_json,
+            recipe=recipe,
+            recipe_json=recipe.model_dump_json(),
             source_type="image",
             source_ref=file.filename,
         )
@@ -246,11 +239,14 @@ def save() -> Response | str:
     if not recipe_json:
         return render_template("partials/extraction_error.html", error="No recipe data")
     try:
-        recipe_data = json.loads(recipe_json)
-        recipe_id = save_recipe(recipe_data, source_type, source_ref)
+        recipe = Recipe.model_validate(json.loads(recipe_json))
+        recipe_id = save_recipe(recipe, source_type, source_ref)
         response = make_response()
         response.headers["HX-Redirect"] = url_for("recipes.detail", recipe_id=recipe_id)
         return response
+    except ValidationError as e:
+        logger.info("Save failed validation")
+        return render_template("partials/extraction_error.html", error=first_error_msg(e))
     except Exception as e:
         logger.exception("Save failed")
         return render_template("partials/extraction_error.html", error=str(e))
@@ -260,15 +256,15 @@ def save() -> Response | str:
 def create_idea() -> Response | str:
     try:
         form = IdeaForm.from_form(request.form)
-        idea_data = {
-            "record_type": RECORD_TYPE_IDEA,
-            "title": form.title,
-            "description": form.description,
-            "ingredients": [],
-            "steps": [],
-            "tags": form.tags,
-        }
-        recipe_id = save_recipe(idea_data, "manual", "")
+        idea = Recipe(
+            record_type=RECORD_TYPE_IDEA,
+            title=form.title,
+            description=form.description or None,
+            ingredients=[],
+            steps=[],
+            tags=form.tags,
+        )
+        recipe_id = save_recipe(idea, "manual", "")
         response = make_response()
         response.headers["HX-Redirect"] = url_for("recipes.detail", recipe_id=recipe_id)
         return response
@@ -285,7 +281,7 @@ def edit_preview(recipe_id: str) -> str:
     recipe = get_recipe(recipe_id)
     if recipe is None:
         abort(404)
-    if recipe.get("record_type") == RECORD_TYPE_IDEA:
+    if recipe.record_type == RECORD_TYPE_IDEA:
         abort(404)
 
     try:
@@ -299,23 +295,17 @@ def edit_preview(recipe_id: str) -> str:
         )
 
     try:
-        result = edit_recipe(recipe, instruction_form.instruction)
-        edited_recipe = normalize_recipe_data(
-            {
-                **result["recipe"],
-                "record_type": recipe.get("record_type"),
-            }
+        edited = edit_recipe(recipe, instruction_form.instruction)
+        edited_recipe = Recipe.model_validate(
+            {**edited.recipe.model_dump(), "record_type": recipe.record_type}
         )
-        change_summary = result.get("change_summary", "")
-        warnings = result.get("warnings", [])
-        recipe_json = json.dumps(edited_recipe)
         return render_template(
             "partials/recipe_edit_preview.html",
             recipe=edited_recipe,
             recipe_id=recipe_id,
-            recipe_json=recipe_json,
-            change_summary=change_summary,
-            warnings=warnings,
+            recipe_json=edited_recipe.model_dump_json(),
+            change_summary=edited.change_summary,
+            warnings=edited.warnings,
         )
     except ExtractionError as e:
         logger.exception("Recipe edit preview failed")
@@ -339,11 +329,14 @@ def apply_edit(recipe_id: str) -> Response | str:
         )
 
     try:
-        recipe_data = json.loads(recipe_json)
-        update_recipe(recipe_id, recipe_data)
+        edited = Recipe.model_validate(json.loads(recipe_json))
+        update_recipe(recipe_id, edited)
         response = make_response()
         response.headers["HX-Redirect"] = url_for("recipes.detail", recipe_id=recipe_id)
         return response
+    except ValidationError as e:
+        logger.info("Apply edit failed validation")
+        return render_template("partials/recipe_edit_error.html", error=first_error_msg(e))
     except Exception as e:
         logger.exception("Apply edit failed")
         return render_template("partials/recipe_edit_error.html", error=str(e))

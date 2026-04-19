@@ -1,11 +1,12 @@
 """Calorie lookup table CRUD operations."""
 
 import sqlite3
-from typing import Any, Mapping
+from typing import Any
 
 from pydantic import ValidationError
 
-from app.schemas.calorie import CalorieEntry
+from app.schemas.calorie import CalorieEntry, MissingCalorie
+from app.schemas.recipe import Recipe
 
 from .db import get_db
 
@@ -20,13 +21,16 @@ def _normalize_key(value: Any) -> str:
     return value.strip().lower()
 
 
-def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-    data: dict[str, Any] = dict(row)
-    data["id"] = str(data["id"])
-    return data
+def _row_to_entry(row: sqlite3.Row) -> CalorieEntry:
+    return CalorieEntry(
+        name=row["name"],
+        unit=row["unit"],
+        reference_quantity=row["reference_quantity"],
+        calories=row["calories"],
+    )
 
 
-def get_calorie(name: str, unit: str | None) -> dict[str, Any] | None:
+def get_calorie(name: str, unit: str | None) -> CalorieEntry | None:
     """Fetch a calorie entry for a (name, unit) pair, case-insensitive."""
     name_key = _normalize_key(name)
     unit_key = _normalize_key(unit)
@@ -37,7 +41,7 @@ def get_calorie(name: str, unit: str | None) -> dict[str, Any] | None:
         f"SELECT * FROM {TABLE} WHERE name_key = ? AND unit_key = ?",
         (name_key, unit_key),
     ).fetchone()
-    return _row_to_dict(row) if row is not None else None
+    return _row_to_entry(row) if row is not None else None
 
 
 def upsert_calorie(
@@ -90,21 +94,16 @@ def upsert_calorie(
     db.commit()
 
 
-def list_missing_for_recipe(recipe: Mapping[str, Any]) -> list[dict[str, Any]]:
+def list_missing_for_recipe(recipe: Recipe) -> list[MissingCalorie]:
     """Return the unique (name, unit) pairs in a recipe with no calorie row.
 
     Deduplicated by normalized key, preserving the first-seen casing for display.
     """
-    ingredients = recipe.get("ingredients") or []
     seen_keys: set[tuple[str, str]] = set()
-    missing: list[dict[str, Any]] = []
-    for ingredient in ingredients:
-        if not isinstance(ingredient, Mapping):
-            continue
-        name = ingredient.get("name")
-        unit = ingredient.get("unit")
-        if not isinstance(name, str) or not name.strip():
-            continue
+    missing: list[MissingCalorie] = []
+    for ingredient in recipe.ingredients:
+        name = ingredient.name
+        unit = ingredient.unit
         name_key = _normalize_key(name)
         unit_key = _normalize_key(unit)
         dedupe_key = (name_key, unit_key)
@@ -112,10 +111,5 @@ def list_missing_for_recipe(recipe: Mapping[str, Any]) -> list[dict[str, Any]]:
             continue
         seen_keys.add(dedupe_key)
         if get_calorie(name, unit) is None:
-            missing.append(
-                {
-                    "name": name.strip(),
-                    "unit": unit.strip() if isinstance(unit, str) and unit.strip() else None,
-                }
-            )
+            missing.append(MissingCalorie(name=name, unit=unit))
     return missing

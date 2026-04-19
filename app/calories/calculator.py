@@ -1,8 +1,8 @@
 """Per-serving calorie calculation for recipes."""
 
-from typing import Any, Mapping
+from typing import Any
 
-from app.schemas.recipe import RECORD_TYPE_IDEA
+from app.schemas.recipe import RECORD_TYPE_IDEA, Recipe
 from app.storage.calories import get_calorie
 
 
@@ -50,38 +50,28 @@ def parse_quantity(value: Any) -> float | None:
     return None
 
 
-def calculate_calories_per_serving(recipe: Mapping[str, Any]) -> float | None:
+def calculate_calories_per_serving(recipe: Recipe) -> float | None:
     """Compute the per-serving calorie count, or None if the data is incomplete."""
-    if recipe.get("record_type") == RECORD_TYPE_IDEA:
+    if recipe.record_type == RECORD_TYPE_IDEA:
         return None
 
-    ingredients = recipe.get("ingredients") or []
-    if not ingredients:
+    if not recipe.ingredients:
         return None
 
-    servings = parse_quantity(recipe.get("servings"))
+    servings = parse_quantity(recipe.servings)
     if servings is None or servings <= 0:
         return None
 
     total = 0.0
-    for ingredient in ingredients:
-        if not isinstance(ingredient, Mapping):
-            return None
-        quantity = parse_quantity(ingredient.get("quantity"))
+    for ingredient in recipe.ingredients:
+        quantity = parse_quantity(ingredient.quantity)
         if quantity is None:
             return None
-        name = ingredient.get("name")
-        if not isinstance(name, str):
-            return None
-        unit = ingredient.get("unit")
-        if unit is not None and not isinstance(unit, str):
-            return None
-        calorie_row = get_calorie(name, unit)
+        calorie_row = get_calorie(ingredient.name, ingredient.unit)
         if calorie_row is None:
             return None
-        reference = calorie_row["reference_quantity"]
-        if not reference:
+        if not calorie_row.reference_quantity:
             return None
-        total += quantity / reference * calorie_row["calories"]
+        total += quantity / calorie_row.reference_quantity * calorie_row.calories
 
     return round(total / servings, 1)

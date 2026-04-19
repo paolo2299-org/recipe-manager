@@ -3,7 +3,21 @@
 import pytest
 
 from app.calories.calculator import calculate_calories_per_serving, parse_quantity
+from app.schemas.recipe import Recipe
 from app.storage.calories import upsert_calorie
+
+
+def _recipe(record_type: str, servings: str, ingredients: list[dict]) -> Recipe:
+    return Recipe.model_validate(
+        {
+            "record_type": record_type,
+            "title": "T",
+            "servings": servings,
+            "ingredients": ingredients,
+            "steps": [{"step_number": 1, "instruction": "Do it."}] if record_type == "recipe" else [],
+            "tags": [],
+        }
+    )
 
 
 @pytest.fixture
@@ -43,79 +57,75 @@ class TestCalculateCaloriesPerServing:
         upsert_calorie("flour", "g", 100, 364)
         upsert_calorie("eggs", None, 1, 70)
 
-        recipe = {
-            "record_type": "recipe",
-            "servings": "4",
-            "ingredients": [
+        recipe = _recipe(
+            "recipe",
+            "4",
+            [
                 {"quantity": "200", "unit": "g", "name": "flour"},
                 {"quantity": "2", "unit": None, "name": "eggs"},
             ],
-        }
+        )
 
         # (200/100*364 + 2/1*70) / 4 = (728 + 140) / 4 = 217.0
         assert calculate_calories_per_serving(recipe) == 217.0
 
     def test_case_insensitive_matching(self, ctx):
         upsert_calorie("Flour", "G", 100, 400)
-        recipe = {
-            "record_type": "recipe",
-            "servings": "2",
-            "ingredients": [{"quantity": "100", "unit": "g", "name": "flour"}],
-        }
+        recipe = _recipe(
+            "recipe",
+            "2",
+            [{"quantity": "100", "unit": "g", "name": "flour"}],
+        )
         assert calculate_calories_per_serving(recipe) == 200.0
 
     def test_fraction_quantity(self, ctx):
         upsert_calorie("butter", "g", 100, 720)
-        recipe = {
-            "record_type": "recipe",
-            "servings": "1",
-            "ingredients": [{"quantity": "1 1/2", "unit": "g", "name": "butter"}],
-        }
+        recipe = _recipe(
+            "recipe",
+            "1",
+            [{"quantity": "1 1/2", "unit": "g", "name": "butter"}],
+        )
         assert calculate_calories_per_serving(recipe) == 10.8
 
     def test_unparseable_quantity_blocks(self, ctx):
         upsert_calorie("salt", "tsp", 1, 0)
-        recipe = {
-            "record_type": "recipe",
-            "servings": "2",
-            "ingredients": [{"quantity": "a pinch", "unit": "tsp", "name": "salt"}],
-        }
+        recipe = _recipe(
+            "recipe",
+            "2",
+            [{"quantity": "a pinch", "unit": "tsp", "name": "salt"}],
+        )
         assert calculate_calories_per_serving(recipe) is None
 
     def test_missing_calorie_row_blocks(self, ctx):
-        recipe = {
-            "record_type": "recipe",
-            "servings": "2",
-            "ingredients": [{"quantity": "100", "unit": "g", "name": "quinoa"}],
-        }
+        recipe = _recipe(
+            "recipe",
+            "2",
+            [{"quantity": "100", "unit": "g", "name": "quinoa"}],
+        )
         assert calculate_calories_per_serving(recipe) is None
 
     def test_unparseable_servings_blocks(self, ctx):
         upsert_calorie("flour", "g", 100, 364)
-        recipe = {
-            "record_type": "recipe",
-            "servings": "a few",
-            "ingredients": [{"quantity": "100", "unit": "g", "name": "flour"}],
-        }
+        recipe = _recipe(
+            "recipe",
+            "a few",
+            [{"quantity": "100", "unit": "g", "name": "flour"}],
+        )
         assert calculate_calories_per_serving(recipe) is None
 
     def test_idea_returns_none(self, ctx):
-        recipe = {
-            "record_type": "idea",
-            "servings": "4",
-            "ingredients": [{"quantity": "200", "unit": "g", "name": "flour"}],
-        }
-        assert calculate_calories_per_serving(recipe) is None
-
-    def test_empty_ingredients_returns_none(self, ctx):
-        recipe = {"record_type": "recipe", "servings": "4", "ingredients": []}
+        recipe = _recipe(
+            "idea",
+            "4",
+            [{"quantity": "200", "unit": "g", "name": "flour"}],
+        )
         assert calculate_calories_per_serving(recipe) is None
 
     def test_zero_servings_returns_none(self, ctx):
         upsert_calorie("flour", "g", 100, 364)
-        recipe = {
-            "record_type": "recipe",
-            "servings": "0",
-            "ingredients": [{"quantity": "100", "unit": "g", "name": "flour"}],
-        }
+        recipe = _recipe(
+            "recipe",
+            "0",
+            [{"quantity": "100", "unit": "g", "name": "flour"}],
+        )
         assert calculate_calories_per_serving(recipe) is None

@@ -172,6 +172,13 @@ class Recipe(BaseModel):
     steps: list[Step] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
 
+    id: str | None = None
+    source_type: str | None = None
+    source_ref: str | None = None
+    calories_per_serving: float | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
     model_config = ConfigDict(extra="ignore")
 
     @field_validator("record_type", mode="before")
