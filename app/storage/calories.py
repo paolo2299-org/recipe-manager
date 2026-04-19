@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from app.calories.negligible import is_negligible
 from app.schemas.calorie import CalorieEntry, MissingCalorie
-from app.schemas.recipe import Ingredient, Recipe
+from app.schemas.recipe import RECORD_TYPE_IDEA, Ingredient, Recipe
 
 from .db import get_db
 
@@ -134,3 +134,14 @@ def list_unparseable_for_recipe(recipe: Recipe) -> list[tuple[int, Ingredient]]:
         if parse_quantity(ingredient.quantity) is None:
             unparseable.append((index, ingredient))
     return unparseable
+
+
+def servings_needs_fix(recipe: Recipe) -> bool:
+    """Return True if the recipe's servings value can't be used to compute per-serving calories."""
+    # Local import to avoid a circular dependency (calculator imports from this module).
+    from app.calories.calculator import parse_quantity
+
+    if recipe.record_type == RECORD_TYPE_IDEA:
+        return False
+    servings = parse_quantity(recipe.servings)
+    return servings is None or servings <= 0
