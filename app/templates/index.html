@@ -5,7 +5,7 @@
     {% if load_error %}
     <p>The recipe database is not available. Fix the configuration below, then refresh.</p>
     {% else %}
-    <p>{{ recipes|length }} recipe{{ 's' if recipes|length != 1 else '' }} in your collection</p>
+    <p id="recipe-count">{{ recipes|length }} recipe{{ 's' if recipes|length != 1 else '' }} in your collection</p>
     {% endif %}
 </hgroup>
 
@@ -15,9 +15,12 @@
     <p>{{ load_error }}</p>
 </article>
 {% elif recipes %}
+<input type="search" id="recipe-search" placeholder="Search by title or tag..." aria-label="Search recipes" autocomplete="off">
 <div class="recipe-grid">
     {% include "partials/recipe_list.html" %}
 </div>
+<p id="recipe-search-empty" hidden><small>No matching recipes.</small></p>
+<script src="{{ url_for('static', filename='js/recipe_search.js') }}" defer></script>
 {% else %}
 <article>
     <p>No recipes yet. <a href="{{ url_for('recipes.add') }}">Add your first recipe</a>.</p>

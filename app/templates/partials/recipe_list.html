@@ -1,5 +1,5 @@
 {% for recipe in recipes %}
-<article>
+<article data-search="{{ (recipe.title ~ ' ' ~ (recipe.tags | join(' '))) | lower }}">
     <header>
         <a href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}">
             <strong>{{ recipe.title }}</strong>
