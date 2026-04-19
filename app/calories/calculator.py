@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from app.calories.negligible import is_negligible
 from app.schemas.recipe import RECORD_TYPE_IDEA, Recipe
 from app.storage.calories import get_calorie
 
@@ -64,6 +65,8 @@ def calculate_calories_per_serving(recipe: Recipe) -> float | None:
 
     total = 0.0
     for ingredient in recipe.ingredients:
+        if is_negligible(ingredient.name):
+            continue
         quantity = parse_quantity(ingredient.quantity)
         if quantity is None:
             return None

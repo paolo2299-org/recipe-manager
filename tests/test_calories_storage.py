@@ -98,3 +98,15 @@ class TestListMissingForRecipe:
     def test_empty_ingredient_list_returns_empty(self, ctx):
         recipe = _idea(ingredients=[])
         assert list_missing_for_recipe(recipe) == []
+
+    def test_negligible_ingredients_are_not_reported_missing(self, ctx):
+        upsert_calorie("flour", "g", 100, 364)
+        recipe = _idea(
+            ingredients=[
+                {"quantity": "100", "unit": "g", "name": "flour"},
+                {"quantity": "1", "unit": "tsp", "name": "salt"},
+                {"quantity": "500", "unit": "ml", "name": "Water"},
+                {"quantity": "1", "unit": "tbsp", "name": "parsley"},
+            ]
+        )
+        assert list_missing_for_recipe(recipe) == []
