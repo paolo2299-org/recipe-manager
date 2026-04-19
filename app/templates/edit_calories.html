@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Add calorie information - {{ recipe.title }}{% endblock %}
+{% block content %}
+<h1>Add calorie information</h1>
+<p><small>For <strong>{{ recipe.title }}</strong></small></p>
+
+{% if error %}
+<article class="auth-error">
+    <p role="alert"><strong>Could not save calorie information:</strong> {{ error }}</p>
+</article>
+{% endif %}
+
+<p>Enter a reference amount and the calories it contains. Leave a row blank to fill it in later.</p>
+
+<form action="{{ url_for('recipes.save_calories', recipe_id=recipe.id) }}" method="post">
+    {% for item in missing %}
+    <fieldset>
+        <legend><strong>{{ item.name }}{% if item.unit %} ({{ item.unit }}){% endif %}</strong></legend>
+        <input type="hidden" name="name" value="{{ item.name }}">
+        <input type="hidden" name="unit" value="{{ item.unit or '' }}">
+        <div class="grid">
+            <label>
+                Reference quantity{% if item.unit %} ({{ item.unit }}){% endif %}
+                <input type="number" name="reference_quantity" step="any" min="0.0001" placeholder="e.g. 100">
+            </label>
+            <label>
+                Calories in that amount
+                <input type="number" name="calories" step="any" min="0" placeholder="e.g. 364">
+            </label>
+        </div>
+    </fieldset>
+    {% endfor %}
+
+    <div class="grid">
+        <button type="submit">Save &amp; return to recipe</button>
+        <a href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}" role="button" class="secondary outline">Cancel</a>
+    </div>
+</form>
+{% endblock %}

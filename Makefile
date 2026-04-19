@@ -20,7 +20,7 @@ down:
 	$(COMPOSE) down --remove-orphans
 
 shell:
-	$(COMPOSE) exec recipe-manager /bin/sh
+	$(COMPOSE) run --rm --service-ports recipe-manager /bin/sh
 
 # Production
 prod-start:

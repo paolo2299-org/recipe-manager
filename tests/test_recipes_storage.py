@@ -2,6 +2,7 @@
 
 import pytest
 
+from app.storage.calories import upsert_calorie
 from app.storage.db import get_db
 from app.storage.recipes import (
     delete_recipe,
@@ -191,6 +192,40 @@ class TestNormalizeRecipeData:
             "steps": [],
             "tags": ["dinner"],
         }
+
+
+class TestCaloriesPerServing:
+    def test_populated_when_all_ingredients_resolve(self, ctx):
+        upsert_calorie("flour", "g", 100, 364)
+        upsert_calorie("butter", "g", 100, 720)
+
+        recipe_id = save_recipe(SAMPLE_RECIPE, "url", "https://example.com")
+        stored = get_recipe(recipe_id)
+
+        # (200/100*364 + 100/100*720) / 12 = (728 + 720) / 12 = 120.67
+        assert stored["calories_per_serving"] == 120.7
+
+    def test_null_when_any_ingredient_missing_calorie_row(self, ctx):
+        upsert_calorie("flour", "g", 100, 364)
+
+        recipe_id = save_recipe(SAMPLE_RECIPE, "url", "https://example.com")
+        stored = get_recipe(recipe_id)
+
+        assert stored["calories_per_serving"] is None
+
+    def test_recompute_on_update(self, ctx):
+        upsert_calorie("flour", "g", 100, 364)
+        upsert_calorie("butter", "g", 100, 720)
+
+        recipe_id = save_recipe(SAMPLE_RECIPE, "url", "https://example.com")
+        assert get_recipe(recipe_id)["calories_per_serving"] is not None
+
+        db = get_db()
+        db.execute("DELETE FROM calories WHERE name_key = 'butter'")
+        db.commit()
+
+        update_recipe(recipe_id, SAMPLE_RECIPE)
+        assert get_recipe(recipe_id)["calories_per_serving"] is None
 
 
 class TestDeleteRecipe:

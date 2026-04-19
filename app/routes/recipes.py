@@ -12,6 +12,7 @@ from app.extraction.claude import (
     extract_from_url,
 )
 from app.extraction.schema import ALLOWED_RECIPE_TAGS
+from app.storage.calories import list_missing_for_recipe, upsert_calorie
 from app.storage.recipes import (
     RECORD_TYPE_IDEA,
     delete_recipe,
@@ -108,6 +109,59 @@ def update_idea(recipe_id):
             },
             allowed_recipe_tags=ALLOWED_RECIPE_TAGS,
             selected_idea_tags=selected_idea_tags,
+            error=str(e),
+        )
+
+
+@bp.route("/recipes/<recipe_id>/calories/edit")
+def edit_calories(recipe_id):
+    recipe = get_recipe(recipe_id)
+    if recipe is None or recipe.get("record_type") == RECORD_TYPE_IDEA:
+        abort(404)
+    missing = list_missing_for_recipe(recipe)
+    if not missing:
+        return redirect(url_for("recipes.detail", recipe_id=recipe_id))
+    return render_template(
+        "edit_calories.html",
+        recipe=recipe,
+        missing=missing,
+        error=None,
+    )
+
+
+@bp.route("/recipes/<recipe_id>/calories/edit", methods=["POST"])
+def save_calories(recipe_id):
+    recipe = get_recipe(recipe_id)
+    if recipe is None or recipe.get("record_type") == RECORD_TYPE_IDEA:
+        abort(404)
+
+    names = request.form.getlist("name")
+    units = request.form.getlist("unit")
+    reference_quantities = request.form.getlist("reference_quantity")
+    calories_values = request.form.getlist("calories")
+
+    try:
+        for name, unit, reference_quantity, calories in zip(
+            names, units, reference_quantities, calories_values
+        ):
+            reference_quantity = reference_quantity.strip()
+            calories = calories.strip()
+            if not reference_quantity and not calories:
+                continue
+            if not reference_quantity or not calories:
+                raise ValueError(
+                    f"Both reference quantity and calories are required for {name}"
+                )
+            upsert_calorie(name, unit or None, float(reference_quantity), float(calories))
+        update_recipe(recipe_id, recipe)
+        return redirect(url_for("recipes.detail", recipe_id=recipe_id))
+    except Exception as e:
+        logger.exception("Saving calorie info failed")
+        missing = list_missing_for_recipe(recipe)
+        return render_template(
+            "edit_calories.html",
+            recipe=recipe,
+            missing=missing,
             error=str(e),
         )
 

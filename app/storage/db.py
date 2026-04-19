@@ -7,24 +7,39 @@ from flask import Flask, current_app, g
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS recipes (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    record_type  TEXT    NOT NULL DEFAULT 'recipe',
-    title        TEXT    NOT NULL,
-    description  TEXT,
-    servings     TEXT,
-    prep_time    TEXT,
-    cook_time    TEXT,
-    total_time   TEXT,
-    ingredients  TEXT    NOT NULL,
-    steps        TEXT    NOT NULL,
-    tags         TEXT    NOT NULL,
-    source_type  TEXT,
-    source_ref   TEXT,
-    created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_type          TEXT    NOT NULL DEFAULT 'recipe',
+    title                TEXT    NOT NULL,
+    description          TEXT,
+    servings             TEXT,
+    prep_time            TEXT,
+    cook_time            TEXT,
+    total_time           TEXT,
+    ingredients          TEXT    NOT NULL,
+    steps                TEXT    NOT NULL,
+    tags                 TEXT    NOT NULL,
+    source_type          TEXT,
+    source_ref           TEXT,
+    calories_per_serving REAL,
+    created_at           TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at           TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_recipes_created_at ON recipes(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS calories (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    name               TEXT NOT NULL,
+    unit               TEXT,
+    name_key           TEXT NOT NULL,
+    unit_key           TEXT NOT NULL,
+    reference_quantity REAL NOT NULL,
+    calories           REAL NOT NULL,
+    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_calories_lookup ON calories(name_key, unit_key);
 """
 
 
@@ -67,6 +82,10 @@ def init_db(app: Flask) -> None:
         if not _has_column(conn, "recipes", "record_type"):
             conn.execute(
                 "ALTER TABLE recipes ADD COLUMN record_type TEXT NOT NULL DEFAULT 'recipe'"
+            )
+        if not _has_column(conn, "recipes", "calories_per_serving"):
+            conn.execute(
+                "ALTER TABLE recipes ADD COLUMN calories_per_serving REAL"
             )
         conn.commit()
     finally:
