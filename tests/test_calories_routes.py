@@ -133,6 +133,245 @@ class TestEditCaloriesGet:
         response = client.get("/recipes/idea-1/calories/edit")
         assert response.status_code == 404
 
+    def test_redirects_to_quantities_when_unparseable_ingredient(self, ctx, client, app):
+        from app.storage.recipes import save_recipe
+
+        with app.app_context():
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Dodgy amounts",
+                        "servings": "4",
+                        "ingredients": [
+                            {"quantity": "200", "unit": "g", "name": "flour"},
+                            {"quantity": "3 - 4", "unit": "tbsp", "name": "oil"},
+                        ],
+                        "steps": [{"step_number": 1, "instruction": "Mix."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+
+        response = client.get(
+            f"/recipes/{recipe_id}/calories/edit", follow_redirects=False
+        )
+        assert response.status_code == 302
+        assert response.headers["Location"] == (
+            f"/recipes/{recipe_id}/ingredients/quantities"
+        )
+
+    def test_negligible_unparseable_does_not_redirect(self, ctx, client, app):
+        from app.storage.recipes import save_recipe
+
+        with app.app_context():
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Salt to taste",
+                        "servings": "4",
+                        "ingredients": [
+                            {"quantity": "200", "unit": "g", "name": "flour"},
+                            {"quantity": None, "name": "salt"},
+                        ],
+                        "steps": [{"step_number": 1, "instruction": "Mix."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+
+        response = client.get(
+            f"/recipes/{recipe_id}/calories/edit", follow_redirects=False
+        )
+        assert response.status_code == 200
+        assert b"flour" in response.data
+
+
+class TestEditIngredientQuantitiesGet:
+    def test_lists_only_unparseable_ingredients(self, ctx, client, app):
+        from app.storage.recipes import save_recipe
+
+        with app.app_context():
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Dodgy amounts",
+                        "servings": "4",
+                        "ingredients": [
+                            {"quantity": "200", "unit": "g", "name": "flour"},
+                            {"quantity": "3 - 4", "unit": "tbsp", "name": "oil"},
+                            {"quantity": None, "name": "garlic"},
+                        ],
+                        "steps": [{"step_number": 1, "instruction": "Mix."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+
+        response = client.get(f"/recipes/{recipe_id}/ingredients/quantities")
+        assert response.status_code == 200
+        assert b"oil" in response.data
+        assert b"garlic" in response.data
+        # flour has a parseable quantity and is not listed as a row to fix
+        assert response.data.count(b"<legend>") == 2
+
+    def test_redirects_when_nothing_to_fix(self, ctx, client, app):
+        from app.storage.recipes import save_recipe
+
+        with app.app_context():
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Clean recipe",
+                        "servings": "4",
+                        "ingredients": [
+                            {"quantity": "200", "unit": "g", "name": "flour"},
+                            {"quantity": "2", "name": "eggs"},
+                        ],
+                        "steps": [{"step_number": 1, "instruction": "Mix."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+
+        response = client.get(
+            f"/recipes/{recipe_id}/ingredients/quantities", follow_redirects=False
+        )
+        assert response.status_code == 302
+        assert response.headers["Location"] == f"/recipes/{recipe_id}/calories/edit"
+
+    @patch("app.routes.recipes.get_recipe")
+    def test_404_for_missing_recipe(self, mock_get, client):
+        mock_get.return_value = None
+        response = client.get("/recipes/999/ingredients/quantities")
+        assert response.status_code == 404
+
+    @patch("app.routes.recipes.get_recipe")
+    def test_404_for_idea(self, mock_get, client):
+        mock_get.return_value = Recipe(
+            id="idea-1",
+            record_type="idea",
+            title="Idea",
+            ingredients=[],
+            steps=[],
+            tags=[],
+        )
+        response = client.get("/recipes/idea-1/ingredients/quantities")
+        assert response.status_code == 404
+
+
+class TestSaveIngredientQuantities:
+    def test_valid_submission_updates_and_redirects(self, ctx, client, app):
+        from app.storage.recipes import get_recipe, save_recipe
+
+        with app.app_context():
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Dodgy amounts",
+                        "servings": "4",
+                        "ingredients": [
+                            {"quantity": "200", "unit": "g", "name": "flour"},
+                            {"quantity": "3 - 4", "unit": "tbsp", "name": "oil"},
+                        ],
+                        "steps": [{"step_number": 1, "instruction": "Mix."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+
+        response = client.post(
+            f"/recipes/{recipe_id}/ingredients/quantities",
+            data={"index": ["1"], "quantity": ["3"], "unit": ["tbsp"]},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        assert response.headers["Location"] == f"/recipes/{recipe_id}/calories/edit"
+
+        with app.app_context():
+            stored = get_recipe(recipe_id)
+            assert stored is not None
+            assert stored.ingredients[0].name == "flour"
+            assert stored.ingredients[1].quantity == "3"
+            assert stored.ingredients[1].unit == "tbsp"
+
+    def test_blank_unit_saved_as_none(self, ctx, client, app):
+        from app.storage.recipes import get_recipe, save_recipe
+
+        with app.app_context():
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "No unit",
+                        "servings": "4",
+                        "ingredients": [
+                            {"quantity": "200", "unit": "g", "name": "flour"},
+                            {"quantity": None, "unit": "cloves", "name": "garlic"},
+                        ],
+                        "steps": [{"step_number": 1, "instruction": "Mix."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+
+        response = client.post(
+            f"/recipes/{recipe_id}/ingredients/quantities",
+            data={"index": ["1"], "quantity": ["2"], "unit": [""]},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        with app.app_context():
+            stored = get_recipe(recipe_id)
+            assert stored is not None
+            assert stored.ingredients[1].quantity == "2"
+            assert stored.ingredients[1].unit is None
+
+    def test_still_unparseable_quantity_shows_error(self, ctx, client, app):
+        from app.storage.recipes import get_recipe, save_recipe
+
+        with app.app_context():
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Still bad",
+                        "servings": "4",
+                        "ingredients": [
+                            {"quantity": "200", "unit": "g", "name": "flour"},
+                            {"quantity": "3 - 4", "unit": "tbsp", "name": "oil"},
+                        ],
+                        "steps": [{"step_number": 1, "instruction": "Mix."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+
+        response = client.post(
+            f"/recipes/{recipe_id}/ingredients/quantities",
+            data={"index": ["1"], "quantity": ["two"], "unit": ["tbsp"]},
+        )
+
+        assert response.status_code == 200
+        assert b"Could not save amounts" in response.data
+        with app.app_context():
+            stored = get_recipe(recipe_id)
+            assert stored is not None
+            assert stored.ingredients[1].quantity == "3 - 4"
+
 
 class TestSaveCalories:
     def test_upserts_and_recomputes(self, ctx, client, app):

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Fix ingredient amounts - {{ recipe.title }}{% endblock %}
+{% block content %}
+<h1>Fix ingredient amounts</h1>
+<p><small>For <strong>{{ recipe.title }}</strong></small></p>
+
+{% if error %}
+<article class="auth-error">
+    <p role="alert"><strong>Could not save amounts:</strong> {{ error }}</p>
+</article>
+{% endif %}
+
+<p>
+    These ingredients don't have an amount we can use to calculate calories.
+    Enter a number (e.g. <code>3</code>, <code>1/2</code>, or <code>1 1/2</code>) and, if it helps, a unit.
+</p>
+
+<form action="{{ url_for('recipes.save_ingredient_quantities', recipe_id=recipe.id) }}" method="post">
+    {% for index, ingredient in unparseable %}
+    <fieldset>
+        <legend><strong>{{ ingredient.name }}</strong></legend>
+        {% if ingredient.quantity or ingredient.unit %}
+        <p><small>Currently: {{ ingredient.quantity or '—' }}{% if ingredient.unit %} {{ ingredient.unit }}{% endif %}</small></p>
+        {% else %}
+        <p><small>Currently: no amount specified</small></p>
+        {% endif %}
+        <input type="hidden" name="index" value="{{ index }}">
+        <div class="grid">
+            <label>
+                Amount
+                <input type="text" name="quantity" required placeholder="e.g. 3 or 1/2">
+            </label>
+            <label>
+                Unit (optional)
+                <input type="text" name="unit" value="{{ ingredient.unit or '' }}" placeholder="e.g. tbsp">
+            </label>
+        </div>
+    </fieldset>
+    {% endfor %}
+
+    <div class="grid">
+        <button type="submit">Save &amp; continue to calorie info</button>
+        <a href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}" role="button" class="secondary outline">Cancel</a>
+    </div>
+</form>
+{% endblock %}

@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 from werkzeug.datastructures import ImmutableMultiDict
 
+from app.calories.calculator import parse_quantity
 from app.schemas.recipe import ALLOWED_RECIPE_TAGS_SET
 
 
@@ -123,6 +124,49 @@ class CalorieBatchForm(BaseModel):
                     "calories": cals_trimmed,
                 }
             )
+        return cls(entries=entries)
+
+
+class IngredientQuantityForm(BaseModel):
+    """Form model for editing ingredient quantities whose original values can't be parsed.
+
+    Incoming form fields are parallel lists (index[], quantity[], unit[]). Every
+    quantity must parse via the calorie calculator; blank units become None.
+    """
+
+    entries: list[dict[str, Any]]
+
+    model_config = ConfigDict(extra="ignore")
+
+    @classmethod
+    def from_form(cls, form: ImmutableMultiDict[str, str]) -> "IngredientQuantityForm":
+        indexes = form.getlist("index")
+        quantities = form.getlist("quantity")
+        units = form.getlist("unit")
+
+        entries: list[dict[str, Any]] = []
+        for raw_index, quantity, unit in zip(indexes, quantities, units):
+            try:
+                index = int(raw_index)
+            except ValueError as exc:
+                raise ValueError("Invalid ingredient reference") from exc
+            quantity_trimmed = quantity.strip()
+            if not quantity_trimmed:
+                raise ValueError("Quantity is required for every ingredient")
+            if parse_quantity(quantity_trimmed) is None:
+                raise ValueError(
+                    f"Quantity '{quantity_trimmed}' can't be parsed — use a number, fraction, or mixed fraction"
+                )
+            unit_trimmed = unit.strip() if isinstance(unit, str) else ""
+            entries.append(
+                {
+                    "index": index,
+                    "quantity": quantity_trimmed,
+                    "unit": unit_trimmed or None,
+                }
+            )
+        if not entries:
+            raise ValueError("No ingredient quantities submitted")
         return cls(entries=entries)
 
 
