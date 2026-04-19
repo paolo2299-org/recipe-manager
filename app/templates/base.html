@@ -18,8 +18,7 @@
                 {% if current_user %}
                 <li><a href="{{ url_for('recipes.index') }}">Recipes</a></li>
                 <li><a href="{{ url_for('recipes.add') }}">Add Recipe</a></li>
-                <li><small class="nav-user">{{ current_user.email }}</small></li>
-                <li>
+<li>
                     <form action="{{ url_for('auth.logout') }}" method="post" class="inline-form">
                         <button type="submit" class="secondary">Sign Out</button>
                     </form>
