@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from app.calories.negligible import is_negligible
 from app.schemas.calorie import CalorieEntry, MissingCalorie
-from app.schemas.recipe import Recipe
+from app.schemas.recipe import Ingredient, Recipe
 
 from .db import get_db
 
@@ -116,3 +116,21 @@ def list_missing_for_recipe(recipe: Recipe) -> list[MissingCalorie]:
         if get_calorie(name, unit) is None:
             missing.append(MissingCalorie(name=name, unit=unit))
     return missing
+
+
+def list_unparseable_for_recipe(recipe: Recipe) -> list[tuple[int, Ingredient]]:
+    """Return (index, ingredient) for non-negligible ingredients with an unparseable quantity.
+
+    Calorie calculation short-circuits on any such ingredient, so the user needs to
+    supply a usable quantity before the calorie editor can succeed.
+    """
+    # Local import to avoid a circular dependency (calculator imports from this module).
+    from app.calories.calculator import parse_quantity
+
+    unparseable: list[tuple[int, Ingredient]] = []
+    for index, ingredient in enumerate(recipe.ingredients):
+        if is_negligible(ingredient.name):
+            continue
+        if parse_quantity(ingredient.quantity) is None:
+            unparseable.append((index, ingredient))
+    return unparseable

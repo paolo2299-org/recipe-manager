@@ -4,7 +4,12 @@ import pytest
 
 from app.schemas.calorie import MissingCalorie
 from app.schemas.recipe import Recipe
-from app.storage.calories import get_calorie, list_missing_for_recipe, upsert_calorie
+from app.storage.calories import (
+    get_calorie,
+    list_missing_for_recipe,
+    list_unparseable_for_recipe,
+    upsert_calorie,
+)
 
 
 def _idea(ingredients: list[dict]) -> Recipe:
@@ -110,3 +115,41 @@ class TestListMissingForRecipe:
             ]
         )
         assert list_missing_for_recipe(recipe) == []
+
+
+class TestListUnparseableForRecipe:
+    def test_returns_non_negligible_unparseable_with_index(self):
+        recipe = _idea(
+            ingredients=[
+                {"quantity": "100", "unit": "g", "name": "flour"},
+                {"quantity": None, "unit": None, "name": "garlic"},
+                {"quantity": "3 - 4", "unit": "tbsp", "name": "oil"},
+                {"quantity": "a pinch", "name": "chilli"},
+                {"quantity": "1 1/2", "unit": "cups", "name": "milk"},
+            ]
+        )
+        result = list_unparseable_for_recipe(recipe)
+        indexes = [index for index, _ in result]
+        names = [ingredient.name for _, ingredient in result]
+        assert indexes == [1, 2, 3]
+        assert names == ["garlic", "oil", "chilli"]
+
+    def test_skips_negligible_ingredients(self):
+        recipe = _idea(
+            ingredients=[
+                {"quantity": None, "name": "salt"},
+                {"quantity": "to taste", "name": "black pepper"},
+                {"quantity": None, "name": "Water"},
+                {"quantity": "1 1/2", "unit": "cups", "name": "milk"},
+            ]
+        )
+        assert list_unparseable_for_recipe(recipe) == []
+
+    def test_empty_list_when_all_parseable(self):
+        recipe = _idea(
+            ingredients=[
+                {"quantity": "100", "unit": "g", "name": "flour"},
+                {"quantity": "2", "name": "eggs"},
+            ]
+        )
+        assert list_unparseable_for_recipe(recipe) == []
