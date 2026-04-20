@@ -62,3 +62,11 @@ class MissingCalorie(BaseModel):
     unit: str | None = None
 
     model_config = ConfigDict(extra="ignore")
+
+
+class PrefilledCalories(BaseModel):
+    """Claude tool payload: per-ingredient calorie suggestions in the same order as the input."""
+
+    entries: list[CalorieEntry]
+
+    model_config = ConfigDict(extra="ignore")

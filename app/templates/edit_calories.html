@@ -6,14 +6,20 @@
 
 {% if error %}
 <article class="auth-error">
-    <p role="alert"><strong>Could not save calorie information:</strong> {{ error }}</p>
+    <p role="alert"><strong>{{ error_label|default("Could not save calorie information") }}:</strong> {{ error }}</p>
 </article>
 {% endif %}
 
 <p>Enter a reference amount and the calories it contains. Leave a row blank to fill it in later.</p>
 
+<form action="{{ url_for('recipes.prefill_calories_route', recipe_id=recipe.id) }}" method="post">
+    <button type="submit" class="secondary">Pre-fill with AI</button>
+    <p><small>Uses AI to estimate typical amounts and calories. You can still edit any row before saving.</small></p>
+</form>
+
 <form action="{{ url_for('recipes.save_calories', recipe_id=recipe.id) }}" method="post">
     {% for item in missing %}
+    {% set suggestion = (suggestions|default({})).get((item.name|lower|trim, (item.unit or '')|lower|trim)) %}
     <fieldset>
         <legend><strong>{{ item.name }}{% if item.unit %} ({{ item.unit }}){% endif %}</strong></legend>
         <input type="hidden" name="name" value="{{ item.name }}">
@@ -21,11 +27,11 @@
         <div class="grid">
             <label>
                 Reference quantity{% if item.unit %} ({{ item.unit }}){% endif %}
-                <input type="number" name="reference_quantity" step="any" min="0.0001" placeholder="e.g. 100">
+                <input type="number" name="reference_quantity" step="any" min="0.0001" placeholder="e.g. 100"{% if suggestion %} value="{{ suggestion.reference_quantity }}"{% endif %}>
             </label>
             <label>
                 Calories in that amount
-                <input type="number" name="calories" step="any" min="0" placeholder="e.g. 364">
+                <input type="number" name="calories" step="any" min="0" placeholder="e.g. 364"{% if suggestion %} value="{{ suggestion.calories }}"{% endif %}>
             </label>
         </div>
     </fieldset>

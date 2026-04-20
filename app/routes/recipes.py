@@ -21,6 +21,7 @@ from app.extraction.claude import (
     edit_recipe,
     extract_from_image,
     extract_from_url,
+    prefill_calories,
 )
 from app.schemas.forms import (
     CalorieBatchForm,
@@ -56,6 +57,13 @@ def _get_idea_or_404(recipe_id: str) -> Recipe:
     if recipe is None or recipe.record_type != RECORD_TYPE_IDEA:
         abort(404)
     return recipe
+
+
+def _suggestion_key(name: str, unit: str | None) -> tuple[str, str]:
+    """Case-insensitive (name, unit) key matching the calorie storage normalization."""
+    name_key = name.strip().lower() if isinstance(name, str) else ""
+    unit_key = unit.strip().lower() if isinstance(unit, str) and unit else ""
+    return name_key, unit_key
 
 
 @bp.route("/")
@@ -149,8 +157,62 @@ def edit_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
         "edit_calories.html",
         recipe=recipe,
         missing=missing,
+        suggestions={},
         error=None,
     )
+
+
+@bp.route("/recipes/<recipe_id>/calories/prefill", methods=["POST"])
+def prefill_calories_route(recipe_id: str) -> Response | WerkzeugResponse | str:
+    recipe = get_recipe(recipe_id)
+    if recipe is None or recipe.record_type == RECORD_TYPE_IDEA:
+        abort(404)
+    if servings_needs_fix(recipe) or list_unparseable_for_recipe(recipe):
+        return redirect(
+            url_for("recipes.edit_ingredient_quantities", recipe_id=recipe_id)
+        )
+    missing = list_missing_for_recipe(recipe)
+    if not missing:
+        return redirect(url_for("recipes.detail", recipe_id=recipe_id))
+
+    try:
+        entries = prefill_calories(missing)
+        # Key by the missing item's (name, unit) so template lookups match even
+        # when Claude picks its own unit for rows where the ingredient had none.
+        suggestions = {
+            _suggestion_key(item.name, item.unit): {
+                "reference_quantity": entry.reference_quantity,
+                "calories": entry.calories,
+            }
+            for item, entry in zip(missing, entries)
+        }
+        return render_template(
+            "edit_calories.html",
+            recipe=recipe,
+            missing=missing,
+            suggestions=suggestions,
+            error=None,
+        )
+    except ExtractionError as e:
+        logger.info("AI calorie prefill failed: %s", e)
+        return render_template(
+            "edit_calories.html",
+            recipe=recipe,
+            missing=missing,
+            suggestions={},
+            error_label="Could not pre-fill with AI",
+            error=str(e),
+        )
+    except Exception as e:
+        logger.exception("AI calorie prefill failed")
+        return render_template(
+            "edit_calories.html",
+            recipe=recipe,
+            missing=missing,
+            suggestions={},
+            error_label="Could not pre-fill with AI",
+            error=str(e),
+        )
 
 
 @bp.route("/recipes/<recipe_id>/ingredients/quantities")
@@ -236,6 +298,7 @@ def save_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
             "edit_calories.html",
             recipe=recipe,
             missing=missing,
+            suggestions={},
             error=first_error_msg(e),
         )
     except Exception as e:
@@ -245,6 +308,7 @@ def save_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
             "edit_calories.html",
             recipe=recipe,
             missing=missing,
+            suggestions={},
             error=str(e),
         )
 
