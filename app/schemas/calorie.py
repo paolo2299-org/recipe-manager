@@ -70,3 +70,16 @@ class PrefilledCalories(BaseModel):
     entries: list[CalorieEntry]
 
     model_config = ConfigDict(extra="ignore")
+
+
+class BreakdownRow(BaseModel):
+    """A single line in the per-ingredient calorie breakdown for a recipe."""
+
+    name: str
+    unit: str | None = None
+    quantity: str | None = None
+    per_serving_calories: float | None = None
+    reference: CalorieEntry | None = None
+    is_negligible: bool = False
+
+    model_config = ConfigDict(extra="ignore")

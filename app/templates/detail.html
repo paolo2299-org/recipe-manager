@@ -29,6 +29,7 @@
 <p>
     {% if recipe.calories_per_serving is not none %}
     <small><strong>Calories per serving:</strong> {{ recipe.calories_per_serving }}</small>
+    <small><a href="{{ url_for('recipes.breakdown', recipe_id=recipe.id) }}">View breakdown</a></small>
     {% else %}
     <a href="{{ url_for('recipes.edit_calories', recipe_id=recipe.id) }}">Add calorie information</a>
     {% endif %}

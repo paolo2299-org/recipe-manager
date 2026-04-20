@@ -16,6 +16,7 @@ from flask import (
 from pydantic import ValidationError
 from werkzeug.wrappers import Response as WerkzeugResponse
 
+from app.calories.breakdown import build_breakdown
 from app.extraction.claude import (
     ExtractionError,
     edit_recipe,
@@ -33,6 +34,7 @@ from app.schemas.forms import (
 )
 from app.schemas.recipe import ALLOWED_RECIPE_TAGS, Recipe
 from app.storage.calories import (
+    get_calorie,
     list_missing_for_recipe,
     list_unparseable_for_recipe,
     servings_needs_fix,
@@ -59,13 +61,6 @@ def _get_idea_or_404(recipe_id: str) -> Recipe:
     return recipe
 
 
-def _suggestion_key(name: str, unit: str | None) -> tuple[str, str]:
-    """Case-insensitive (name, unit) key matching the calorie storage normalization."""
-    name_key = name.strip().lower() if isinstance(name, str) else ""
-    unit_key = unit.strip().lower() if isinstance(unit, str) and unit else ""
-    return name_key, unit_key
-
-
 @bp.route("/")
 def index() -> str:
     try:
@@ -85,6 +80,17 @@ def detail(recipe_id: str) -> str:
     if recipe is None:
         abort(404)
     return render_template("detail.html", recipe=recipe)
+
+
+@bp.route("/recipes/<recipe_id>/calories/breakdown")
+def breakdown(recipe_id: str) -> Response | WerkzeugResponse | str:
+    recipe = get_recipe(recipe_id)
+    if recipe is None or recipe.record_type == RECORD_TYPE_IDEA:
+        abort(404)
+    if recipe.calories_per_serving is None:
+        return redirect(url_for("recipes.edit_calories", recipe_id=recipe_id))
+    rows = build_breakdown(recipe)
+    return render_template("breakdown.html", recipe=recipe, rows=rows)
 
 
 @bp.route("/recipes/<recipe_id>/edit")
@@ -141,25 +147,62 @@ def update_idea(recipe_id: str) -> Response | WerkzeugResponse | str:
         )
 
 
+def _single_ingredient_item(
+    name: str, unit: str | None
+) -> dict[str, object]:
+    """Build the edit-form item dict for a single ingredient, pre-filled if a row exists."""
+    entry = get_calorie(name, unit)
+    return {
+        "name": name,
+        "unit": unit or None,
+        "reference_quantity": entry.reference_quantity if entry is not None else None,
+        "calories": entry.calories if entry is not None else None,
+    }
+
+
 @bp.route("/recipes/<recipe_id>/calories/edit")
 def edit_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
     recipe = get_recipe(recipe_id)
     if recipe is None or recipe.record_type == RECORD_TYPE_IDEA:
         abort(404)
+    scope_name = request.args.get("name", "").strip()
+    scope_unit = request.args.get("unit", "").strip() or None
+    return_to = request.args.get("return_to", "").strip()
+    single_mode = bool(scope_name)
+
     if servings_needs_fix(recipe) or list_unparseable_for_recipe(recipe):
         return redirect(
             url_for("recipes.edit_ingredient_quantities", recipe_id=recipe_id)
         )
-    missing = list_missing_for_recipe(recipe)
-    if not missing:
-        return redirect(url_for("recipes.detail", recipe_id=recipe_id))
+
+    if single_mode:
+        items: list[dict[str, object]] = [
+            _single_ingredient_item(scope_name, scope_unit)
+        ]
+    else:
+        missing = list_missing_for_recipe(recipe)
+        if not missing:
+            return redirect(url_for("recipes.detail", recipe_id=recipe_id))
+        items = [
+            {"name": item.name, "unit": item.unit, "reference_quantity": None, "calories": None}
+            for item in missing
+        ]
+
     return render_template(
         "edit_calories.html",
         recipe=recipe,
-        missing=missing,
-        suggestions={},
+        items=items,
+        single_mode=single_mode,
+        return_to=return_to,
         error=None,
     )
+
+
+def _missing_items(recipe: Recipe) -> list[dict[str, object]]:
+    return [
+        {"name": item.name, "unit": item.unit, "reference_quantity": None, "calories": None}
+        for item in list_missing_for_recipe(recipe)
+    ]
 
 
 @bp.route("/recipes/<recipe_id>/calories/prefill", methods=["POST"])
@@ -177,20 +220,21 @@ def prefill_calories_route(recipe_id: str) -> Response | WerkzeugResponse | str:
 
     try:
         entries = prefill_calories(missing)
-        # Key by the missing item's (name, unit) so template lookups match even
-        # when Claude picks its own unit for rows where the ingredient had none.
-        suggestions = {
-            _suggestion_key(item.name, item.unit): {
+        items = [
+            {
+                "name": item.name,
+                "unit": item.unit,
                 "reference_quantity": entry.reference_quantity,
                 "calories": entry.calories,
             }
             for item, entry in zip(missing, entries)
-        }
+        ]
         return render_template(
             "edit_calories.html",
             recipe=recipe,
-            missing=missing,
-            suggestions=suggestions,
+            items=items,
+            single_mode=False,
+            return_to="",
             error=None,
         )
     except ExtractionError as e:
@@ -198,8 +242,9 @@ def prefill_calories_route(recipe_id: str) -> Response | WerkzeugResponse | str:
         return render_template(
             "edit_calories.html",
             recipe=recipe,
-            missing=missing,
-            suggestions={},
+            items=_missing_items(recipe),
+            single_mode=False,
+            return_to="",
             error_label="Could not pre-fill with AI",
             error=str(e),
         )
@@ -208,8 +253,9 @@ def prefill_calories_route(recipe_id: str) -> Response | WerkzeugResponse | str:
         return render_template(
             "edit_calories.html",
             recipe=recipe,
-            missing=missing,
-            suggestions={},
+            items=_missing_items(recipe),
+            single_mode=False,
+            return_to="",
             error_label="Could not pre-fill with AI",
             error=str(e),
         )
@@ -280,6 +326,21 @@ def save_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
     if recipe is None or recipe.record_type == RECORD_TYPE_IDEA:
         abort(404)
 
+    scope_name = request.args.get("name", "").strip()
+    scope_unit = request.args.get("unit", "").strip() or None
+    return_to = request.args.get("return_to", "").strip()
+    single_mode = bool(scope_name)
+
+    def _items_for_error() -> list[dict[str, object]]:
+        if single_mode:
+            return [_single_ingredient_item(scope_name, scope_unit)]
+        return _missing_items(recipe)
+
+    def _success_redirect() -> WerkzeugResponse:
+        if return_to == "breakdown":
+            return redirect(url_for("recipes.breakdown", recipe_id=recipe_id))
+        return redirect(url_for("recipes.detail", recipe_id=recipe_id))
+
     try:
         batch = CalorieBatchForm.from_form(request.form)
         for entry in batch.entries:
@@ -290,25 +351,25 @@ def save_calories(recipe_id: str) -> Response | WerkzeugResponse | str:
                 float(entry["calories"]),
             )
         update_recipe(recipe_id, recipe)
-        return redirect(url_for("recipes.detail", recipe_id=recipe_id))
+        return _success_redirect()
     except ValidationError as e:
         logger.info("Saving calorie info failed validation")
-        missing = list_missing_for_recipe(recipe)
         return render_template(
             "edit_calories.html",
             recipe=recipe,
-            missing=missing,
-            suggestions={},
+            items=_items_for_error(),
+            single_mode=single_mode,
+            return_to=return_to,
             error=first_error_msg(e),
         )
     except Exception as e:
         logger.exception("Saving calorie info failed")
-        missing = list_missing_for_recipe(recipe)
         return render_template(
             "edit_calories.html",
             recipe=recipe,
-            missing=missing,
-            suggestions={},
+            items=_items_for_error(),
+            single_mode=single_mode,
+            return_to=return_to,
             error=str(e),
         )
 

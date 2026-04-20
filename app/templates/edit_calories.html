@@ -1,7 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Add calorie information - {{ recipe.title }}{% endblock %}
+{% block title %}{% if single_mode %}Edit calorie information{% else %}Add calorie information{% endif %} - {{ recipe.title }}{% endblock %}
 {% block content %}
+{% if single_mode %}
+<h1>Edit calorie information</h1>
+{% else %}
 <h1>Add calorie information</h1>
+{% endif %}
 <p><small>For <strong>{{ recipe.title }}</strong></small></p>
 
 {% if error %}
@@ -12,14 +16,25 @@
 
 <p>Enter a reference amount and the calories it contains. Leave a row blank to fill it in later.</p>
 
+{% if single_mode %}
+{% set form_action = url_for('recipes.save_calories', recipe_id=recipe.id, return_to=return_to, name=items[0].name, unit=(items[0].unit or '')) %}
+{% set cancel_url = url_for('recipes.breakdown', recipe_id=recipe.id) if return_to == 'breakdown' else url_for('recipes.detail', recipe_id=recipe.id) %}
+{% set save_label = 'Save & return to breakdown' if return_to == 'breakdown' else 'Save' %}
+{% else %}
+{% set form_action = url_for('recipes.save_calories', recipe_id=recipe.id) %}
+{% set cancel_url = url_for('recipes.detail', recipe_id=recipe.id) %}
+{% set save_label = 'Save & return to recipe' %}
+{% endif %}
+
+{% if not single_mode %}
 <form action="{{ url_for('recipes.prefill_calories_route', recipe_id=recipe.id) }}" method="post">
     <button type="submit" class="secondary">Pre-fill with AI</button>
     <p><small>Uses AI to estimate typical amounts and calories. You can still edit any row before saving.</small></p>
 </form>
+{% endif %}
 
-<form action="{{ url_for('recipes.save_calories', recipe_id=recipe.id) }}" method="post">
-    {% for item in missing %}
-    {% set suggestion = (suggestions|default({})).get((item.name|lower|trim, (item.unit or '')|lower|trim)) %}
+<form action="{{ form_action }}" method="post">
+    {% for item in items %}
     <fieldset>
         <legend><strong>{{ item.name }}{% if item.unit %} ({{ item.unit }}){% endif %}</strong></legend>
         <input type="hidden" name="name" value="{{ item.name }}">
@@ -27,19 +42,19 @@
         <div class="grid">
             <label>
                 Reference quantity{% if item.unit %} ({{ item.unit }}){% endif %}
-                <input type="number" name="reference_quantity" step="any" min="0.0001" placeholder="e.g. 100"{% if suggestion %} value="{{ suggestion.reference_quantity }}"{% endif %}>
+                <input type="number" name="reference_quantity" step="any" min="0.0001" placeholder="e.g. 100"{% if item.reference_quantity is not none %} value="{{ item.reference_quantity }}"{% endif %}>
             </label>
             <label>
                 Calories in that amount
-                <input type="number" name="calories" step="any" min="0" placeholder="e.g. 364"{% if suggestion %} value="{{ suggestion.calories }}"{% endif %}>
+                <input type="number" name="calories" step="any" min="0" placeholder="e.g. 364"{% if item.calories is not none %} value="{{ item.calories }}"{% endif %}>
             </label>
         </div>
     </fieldset>
     {% endfor %}
 
     <div class="grid">
-        <button type="submit">Save &amp; return to recipe</button>
-        <a href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}" role="button" class="secondary outline">Cancel</a>
+        <button type="submit">{{ save_label }}</button>
+        <a href="{{ cancel_url }}" role="button" class="secondary outline">Cancel</a>
     </div>
 </form>
 {% endblock %}
