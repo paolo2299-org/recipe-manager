@@ -4,6 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
+from app.extraction.claude import ExtractionError
+from app.schemas.calorie import CalorieEntry
 from app.schemas.recipe import Recipe
 from app.storage.calories import get_calorie, upsert_calorie
 from tests.conftest import SAMPLE_RECIPE_DB, make_recipe
@@ -650,3 +652,224 @@ class TestSaveCalories:
 
         assert response.status_code == 200
         assert b"Could not save calorie information" in response.data
+
+
+class TestPrefillCalories:
+    def _seed_recipe(self, app):
+        from app.storage.recipes import save_recipe
+
+        with app.app_context():
+            return save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Shortbread",
+                        "servings": "12",
+                        "ingredients": [
+                            {"quantity": "200", "unit": "g", "name": "flour"},
+                            {"quantity": "100", "unit": "g", "name": "butter"},
+                        ],
+                        "steps": [{"step_number": 1, "instruction": "Mix."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+
+    @patch("app.routes.recipes.prefill_calories")
+    def test_populates_inputs_and_persists_nothing(
+        self, mock_prefill, ctx, client, app
+    ):
+        mock_prefill.return_value = [
+            CalorieEntry(name="flour", unit="g", reference_quantity=100, calories=364),
+            CalorieEntry(name="butter", unit="g", reference_quantity=100, calories=720),
+        ]
+        recipe_id = self._seed_recipe(app)
+
+        response = client.post(f"/recipes/{recipe_id}/calories/prefill")
+
+        assert response.status_code == 200
+        assert b'value="100.0"' in response.data
+        assert b'value="364.0"' in response.data
+        assert b'value="720.0"' in response.data
+        with app.app_context():
+            assert get_calorie("flour", "g") is None
+            assert get_calorie("butter", "g") is None
+
+    @patch("app.routes.recipes.prefill_calories")
+    def test_preserves_null_unit_suggestion(self, mock_prefill, ctx, client, app):
+        from app.storage.recipes import save_recipe
+
+        # eggs has no unit in the recipe; the prompt asks Claude to preserve that
+        # null unit so the calorie entry stays keyed to the same (name, unit) as
+        # the ingredient when the user saves.
+        with app.app_context():
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Scramble",
+                        "servings": "2",
+                        "ingredients": [{"quantity": "2", "name": "eggs"}],
+                        "steps": [{"step_number": 1, "instruction": "Whisk."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+        mock_prefill.return_value = [
+            CalorieEntry(name="eggs", unit=None, reference_quantity=1, calories=78),
+        ]
+
+        response = client.post(f"/recipes/{recipe_id}/calories/prefill")
+
+        assert response.status_code == 200
+        assert b'value="1.0"' in response.data
+        assert b'value="78.0"' in response.data
+
+    @patch("app.routes.recipes.prefill_calories")
+    def test_defensive_match_when_claude_ignores_null_unit_rule(
+        self, mock_prefill, ctx, client, app
+    ):
+        from app.storage.recipes import save_recipe
+
+        # Defense in depth: suggestions are keyed by the recipe's (name, unit),
+        # not by whatever unit Claude returns, so even if Claude ignores the
+        # "preserve the input unit" rule the form still populates and the
+        # hidden `unit` input keeps storage keyed correctly.
+        with app.app_context():
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Scramble",
+                        "servings": "2",
+                        "ingredients": [{"quantity": "2", "name": "eggs"}],
+                        "steps": [{"step_number": 1, "instruction": "Whisk."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+        mock_prefill.return_value = [
+            CalorieEntry(name="eggs", unit="whole", reference_quantity=1, calories=78),
+        ]
+
+        response = client.post(f"/recipes/{recipe_id}/calories/prefill")
+
+        assert response.status_code == 200
+        assert b'value="1.0"' in response.data
+        assert b'value="78.0"' in response.data
+
+    @patch("app.routes.recipes.prefill_calories")
+    def test_extraction_error_shows_prefill_banner(
+        self, mock_prefill, ctx, client, app
+    ):
+        mock_prefill.side_effect = ExtractionError("Claude API call failed: timeout")
+        recipe_id = self._seed_recipe(app)
+
+        response = client.post(f"/recipes/{recipe_id}/calories/prefill")
+
+        assert response.status_code == 200
+        assert b"Could not pre-fill with AI" in response.data
+        # Inputs render without pre-filled values.
+        assert b"value=\"" not in _extract_input_values(response.data)
+
+    @patch("app.routes.recipes.prefill_calories")
+    def test_unexpected_error_shows_prefill_banner(
+        self, mock_prefill, ctx, client, app
+    ):
+        mock_prefill.side_effect = RuntimeError("boom")
+        recipe_id = self._seed_recipe(app)
+
+        response = client.post(f"/recipes/{recipe_id}/calories/prefill")
+
+        assert response.status_code == 200
+        assert b"Could not pre-fill with AI" in response.data
+
+    def test_redirects_when_nothing_missing(self, ctx, client, app):
+        from app.storage.recipes import save_recipe
+
+        with app.app_context():
+            upsert_calorie("flour", "g", 100, 364)
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Flour cake",
+                        "servings": "4",
+                        "ingredients": [
+                            {"quantity": "200", "unit": "g", "name": "flour"},
+                        ],
+                        "steps": [{"step_number": 1, "instruction": "Mix."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+
+        response = client.post(
+            f"/recipes/{recipe_id}/calories/prefill", follow_redirects=False
+        )
+
+        assert response.status_code == 302
+        assert response.headers["Location"] == f"/recipes/{recipe_id}"
+
+    def test_redirects_to_quantities_when_unparseable(self, ctx, client, app):
+        from app.storage.recipes import save_recipe
+
+        with app.app_context():
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Dodgy amounts",
+                        "servings": "4",
+                        "ingredients": [
+                            {"quantity": "200", "unit": "g", "name": "flour"},
+                            {"quantity": "3 - 4", "unit": "tbsp", "name": "oil"},
+                        ],
+                        "steps": [{"step_number": 1, "instruction": "Mix."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+
+        response = client.post(
+            f"/recipes/{recipe_id}/calories/prefill", follow_redirects=False
+        )
+
+        assert response.status_code == 302
+        assert response.headers["Location"] == (
+            f"/recipes/{recipe_id}/ingredients/quantities"
+        )
+
+    @patch("app.routes.recipes.get_recipe")
+    def test_404_for_missing_recipe(self, mock_get, client):
+        mock_get.return_value = None
+        response = client.post("/recipes/999/calories/prefill")
+        assert response.status_code == 404
+
+    @patch("app.routes.recipes.get_recipe")
+    def test_404_for_idea(self, mock_get, client):
+        mock_get.return_value = Recipe(
+            id="idea-1",
+            record_type="idea",
+            title="Idea",
+            ingredients=[],
+            steps=[],
+            tags=[],
+        )
+        response = client.post("/recipes/idea-1/calories/prefill")
+        assert response.status_code == 404
+
+
+def _extract_input_values(body: bytes) -> bytes:
+    """Return only the <input type="number" ...> fragments of the form body for assertions."""
+    # Cheap way to ignore the hidden name/unit inputs when checking that no numeric prefills appear.
+    fragments = []
+    for chunk in body.split(b"<input "):
+        if b'type="number"' in chunk:
+            fragments.append(chunk.split(b">", 1)[0])
+    return b"\n".join(fragments)

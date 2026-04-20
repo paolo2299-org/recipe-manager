@@ -7,11 +7,12 @@ from typing import Any
 import anthropic
 from pydantic import ValidationError
 
+from app.schemas.calorie import CalorieEntry, MissingCalorie, PrefilledCalories
 from app.schemas.recipe import EditedRecipe, Recipe
 
 from .image import prepare_image
 from .jina import fetch_via_jina
-from .schema import EDIT_RECIPE_TOOL, EXTRACT_RECIPE_TOOL
+from .schema import EDIT_RECIPE_TOOL, EXTRACT_RECIPE_TOOL, FILL_CALORIES_TOOL
 
 logger = logging.getLogger(__name__)
 
@@ -174,3 +175,59 @@ def edit_recipe(recipe: Recipe, instruction: str) -> EditedRecipe:
         return EditedRecipe.model_validate(payload)
     except ValidationError as exc:
         raise ExtractionError(f"Claude returned invalid edit payload: {exc}") from exc
+
+
+def prefill_calories(missing: list[MissingCalorie]) -> list[CalorieEntry]:
+    """Ask Claude for a reference quantity and calorie estimate per ingredient.
+
+    Entries are returned in the same order as the input.
+    """
+    if not missing:
+        return []
+
+    items = [{"name": item.name, "unit": item.unit} for item in missing]
+    items_json = json.dumps(items, indent=2)
+
+    try:
+        payload = _call_claude_tool(
+            [
+                {
+                    "role": "user",
+                    "content": (
+                        "You are estimating calorie information for recipe ingredients. "
+                        "For each item below, suggest a typical reference quantity and the "
+                        "calories in that amount, then call the fill_calories tool.\n\n"
+                        "Rules:\n"
+                        "- Return one entry per input item, in the same order.\n"
+                        "- Copy the `name` exactly as provided.\n"
+                        "- Copy the `unit` exactly as provided on every entry, including "
+                        "  leaving it null when the input unit is null. Do NOT invent a unit "
+                        "  or change the unit — the caller keys off this value downstream.\n"
+                        "- A null unit means the ingredient is counted in whole items (e.g. "
+                        "  '2 eggs' -> unit=null, think 'each'). For null-unit items set "
+                        "  reference_quantity to a count of whole items (usually 1, meaning "
+                        "  'one whole egg') and set calories to the calories in that count.\n"
+                        "- When a unit is provided, the reference_quantity must be expressed "
+                        "  in that unit (e.g. unit='g' -> reference_quantity=100 meaning 100 g, "
+                        "  unit='tbsp' -> reference_quantity=1 meaning 1 tbsp).\n"
+                        "- reference_quantity must be > 0; calories must be >= 0.\n"
+                        "- Prefer round, commonly-used reference amounts (100 g, 1 whole egg, "
+                        "  1 tbsp, 1 cup, etc.).\n"
+                        "- Do your best estimate — the user will review and can edit every row.\n\n"
+                        f"Ingredients:\n{items_json}"
+                    ),
+                }
+            ],
+            FILL_CALORIES_TOOL,
+        )
+    except ExtractionError:
+        raise
+    except Exception as e:
+        raise ExtractionError(f"Claude API call failed: {e}") from e
+
+    try:
+        return PrefilledCalories.model_validate(payload).entries
+    except ValidationError as exc:
+        raise ExtractionError(
+            f"Claude returned invalid calorie suggestions: {exc}"
+        ) from exc

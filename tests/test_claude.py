@@ -9,7 +9,9 @@ from app.extraction.claude import (
     _call_claude,
     extract_from_image,
     extract_from_url,
+    prefill_calories,
 )
+from app.schemas.calorie import MissingCalorie
 from app.schemas.recipe import Recipe
 
 from tests.conftest import SAMPLE_RECIPE
@@ -121,3 +123,74 @@ class TestExtractFromImage:
 
         with pytest.raises(ExtractionError, match="Claude API call failed"):
             extract_from_image(b"fake", "recipe.jpg")
+
+
+class TestPrefillCalories:
+    @patch("app.extraction.claude.anthropic.Anthropic")
+    def test_success(self, mock_anthropic_cls):
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+        tool_block = MagicMock()
+        tool_block.type = "tool_use"
+        tool_block.name = "fill_calories"
+        tool_block.input = {
+            "entries": [
+                {"name": "flour", "unit": "g", "reference_quantity": 100, "calories": 364},
+                {"name": "butter", "unit": "g", "reference_quantity": 100, "calories": 720},
+            ]
+        }
+        response = MagicMock()
+        response.content = [tool_block]
+        response.usage.input_tokens = 50
+        response.usage.output_tokens = 80
+        mock_client.messages.create.return_value = response
+
+        result = prefill_calories(
+            [
+                MissingCalorie(name="flour", unit="g"),
+                MissingCalorie(name="butter", unit="g"),
+            ]
+        )
+
+        assert len(result) == 2
+        assert result[0].name == "flour"
+        assert result[0].reference_quantity == 100
+        assert result[0].calories == 364
+        assert result[1].name == "butter"
+        assert result[1].calories == 720
+
+    def test_empty_input_returns_empty_without_calling_claude(self):
+        with patch("app.extraction.claude.anthropic.Anthropic") as mock_cls:
+            assert prefill_calories([]) == []
+            mock_cls.assert_not_called()
+
+    @patch("app.extraction.claude.anthropic.Anthropic")
+    def test_api_failure_raises_extraction_error(self, mock_anthropic_cls):
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+        mock_client.messages.create.side_effect = RuntimeError("boom")
+
+        with pytest.raises(ExtractionError, match="Claude API call failed"):
+            prefill_calories([MissingCalorie(name="flour", unit="g")])
+
+    @patch("app.extraction.claude.anthropic.Anthropic")
+    def test_invalid_payload_raises_extraction_error(self, mock_anthropic_cls):
+        mock_client = MagicMock()
+        mock_anthropic_cls.return_value = mock_client
+        tool_block = MagicMock()
+        tool_block.type = "tool_use"
+        tool_block.name = "fill_calories"
+        # reference_quantity must be > 0 per CalorieEntry validation.
+        tool_block.input = {
+            "entries": [
+                {"name": "flour", "unit": "g", "reference_quantity": 0, "calories": 0}
+            ]
+        }
+        response = MagicMock()
+        response.content = [tool_block]
+        response.usage.input_tokens = 1
+        response.usage.output_tokens = 1
+        mock_client.messages.create.return_value = response
+
+        with pytest.raises(ExtractionError, match="invalid calorie suggestions"):
+            prefill_calories([MissingCalorie(name="flour", unit="g")])
