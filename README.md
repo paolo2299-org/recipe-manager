@@ -1,12 +1,10 @@
 # Recipe Manager
 
-A web application for extracting and saving structured recipe data from photos and URLs using Claude's vision and tool use APIs.
+A web application for extracting and saving structured recipe data from photos and URLs using the Claude API.
 
 ## Overview
 
 Upload a photo of a recipe or paste a URL, and the app uses Claude to extract structured information — title, ingredients, steps, timings, and tags. You can also save lightweight recipe ideas with just a name, notes, and tags. Entries are stored in a local SQLite database and can be browsed, viewed, and deleted.
-
-Built with Flask, HTMX, Pico CSS, SQLite, and Google OpenID Connect. Intended for self-hosted deployment.
 
 ## Prerequisites
 
@@ -17,7 +15,7 @@ Built with Flask, HTMX, Pico CSS, SQLite, and Google OpenID Connect. Intended fo
 
 ## Setup
 
-### 1. Clone and configure environment
+### 1. Configure environment
 
 ```bash
 cp .env.example .env
@@ -29,7 +27,7 @@ Edit `.env` and set at minimum:
 ANTHROPIC_API_KEY=your_key_here
 GOOGLE_CLIENT_ID=your_google_oauth_client_id
 GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
-GOOGLE_ALLOWED_EMAILS=chef@example.com
+GOOGLE_ALLOWED_EMAILS=user@example.com
 SECRET_KEY=change-me-in-production
 ```
 
@@ -65,11 +63,6 @@ Useful local commands:
 - `make down` stops and removes the local containers.
 
 If `.env` is not present yet, the `make` targets automatically fall back to `.env.example` so teardown and config validation still work in a fresh checkout. To actually run the app against real credentials, copy `.env.example` to `.env` and fill in the secrets.
-
-Under the hood, local development uses:
-
-```bash
-docker compose -f compose.yml -f compose.dev.yml up
 ```
 
 ## Running tests
