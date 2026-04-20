@@ -98,7 +98,13 @@ class TestListRecipes:
     def test_empty_database(self, ctx):
         assert list_recipes() == []
 
-    def test_respects_limit(self, ctx):
+    def test_returns_all_recipes_by_default(self, ctx):
+        for i in range(3):
+            save_recipe(_sample().model_copy(update={"title": f"R{i}"}), "url", str(i))
+
+        assert len(list_recipes()) == 3
+
+    def test_respects_explicit_limit(self, ctx):
         for i in range(3):
             save_recipe(_sample().model_copy(update={"title": f"R{i}"}), "url", str(i))
 
