@@ -697,12 +697,46 @@ class TestPrefillCalories:
             assert get_calorie("butter", "g") is None
 
     @patch("app.routes.recipes.prefill_calories")
-    def test_uses_missing_unit_for_key_even_when_claude_picks_one(
+    def test_preserves_null_unit_suggestion(self, mock_prefill, ctx, client, app):
+        from app.storage.recipes import save_recipe
+
+        # eggs has no unit in the recipe; the prompt asks Claude to preserve that
+        # null unit so the calorie entry stays keyed to the same (name, unit) as
+        # the ingredient when the user saves.
+        with app.app_context():
+            recipe_id = save_recipe(
+                Recipe.model_validate(
+                    {
+                        "title": "Scramble",
+                        "servings": "2",
+                        "ingredients": [{"quantity": "2", "name": "eggs"}],
+                        "steps": [{"step_number": 1, "instruction": "Whisk."}],
+                        "tags": [],
+                    }
+                ),
+                "url",
+                "",
+            )
+        mock_prefill.return_value = [
+            CalorieEntry(name="eggs", unit=None, reference_quantity=1, calories=78),
+        ]
+
+        response = client.post(f"/recipes/{recipe_id}/calories/prefill")
+
+        assert response.status_code == 200
+        assert b'value="1.0"' in response.data
+        assert b'value="78.0"' in response.data
+
+    @patch("app.routes.recipes.prefill_calories")
+    def test_defensive_match_when_claude_ignores_null_unit_rule(
         self, mock_prefill, ctx, client, app
     ):
         from app.storage.recipes import save_recipe
 
-        # eggs has no unit in the recipe; Claude may return a unit like "whole".
+        # Defense in depth: suggestions are keyed by the recipe's (name, unit),
+        # not by whatever unit Claude returns, so even if Claude ignores the
+        # "preserve the input unit" rule the form still populates and the
+        # hidden `unit` input keeps storage keyed correctly.
         with app.app_context():
             recipe_id = save_recipe(
                 Recipe.model_validate(
