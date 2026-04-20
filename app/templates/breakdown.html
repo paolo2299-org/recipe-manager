@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Calorie breakdown - {{ recipe.title }}{% endblock %}
+{% block content %}
+<h1>Calorie breakdown</h1>
+<p><small>For <a href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}"><strong>{{ recipe.title }}</strong></a></small></p>
+
+<p><strong>Total per serving:</strong> {{ recipe.calories_per_serving }} kcal</p>
+
+<table>
+    <thead>
+        <tr>
+            <th scope="col">Ingredient</th>
+            <th scope="col">In recipe</th>
+            <th scope="col">Per serving</th>
+            <th scope="col">Reference</th>
+            <th scope="col"></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            <td>{{ row.name }}{% if row.unit %} ({{ row.unit }}){% endif %}</td>
+            <td>
+                {% if row.quantity %}{{ row.quantity }}{% endif %}
+                {% if row.unit %} {{ row.unit }}{% endif %}
+            </td>
+            <td>
+                {% if row.is_negligible %}
+                <em>negligible</em>
+                {% elif row.per_serving_calories is not none %}
+                {{ row.per_serving_calories }} kcal
+                {% else %}
+                <em>no data</em>
+                {% endif %}
+            </td>
+            <td>
+                {% if row.reference %}
+                {{ row.reference.calories }} kcal per {{ row.reference.reference_quantity }}{% if row.unit %} {{ row.unit }}{% endif %}
+                {% else %}
+                &mdash;
+                {% endif %}
+            </td>
+            <td>
+                {% if not row.is_negligible %}
+                <a href="{{ url_for('recipes.edit_calories', recipe_id=recipe.id, name=row.name, unit=(row.unit or ''), return_to='breakdown') }}" role="button" class="secondary outline">Edit</a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p><a href="{{ url_for('recipes.detail', recipe_id=recipe.id) }}">&larr; Back to recipe</a></p>
+{% endblock %}

@@ -25,6 +25,13 @@ Primary commands:
 - `make shell` to open a shell in the app container
 - `make down` to stop local containers
 
+**For LLM agents (Claude, Codex, etc.):** default to running tests and any
+other repo code through Docker (`make test`, `make shell`, or the underlying
+`docker compose` commands). Do not fall back to `python`, `pytest`, `pip`, or
+`uv` on the host — the host Python environment is not guaranteed to exist or
+to match the Docker image's dependencies. If a Docker command fails, debug
+the container setup; do not work around it by running on the host.
+
 Underlying Compose usage:
 
 - local development uses `docker compose -f compose.yml -f compose.dev.yml up`
