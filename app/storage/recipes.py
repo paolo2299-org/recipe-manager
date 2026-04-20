@@ -79,13 +79,15 @@ def get_recipe(recipe_id: str) -> Recipe | None:
     return _row_to_recipe(row)
 
 
-def list_recipes(limit: int = 50) -> list[Recipe]:
+def list_recipes(limit: int | None = None) -> list[Recipe]:
     """List recipes ordered by creation date, newest first."""
     db = get_db()
-    rows = db.execute(
-        f"SELECT * FROM {TABLE} ORDER BY created_at DESC, id DESC LIMIT ?",
-        (limit,),
-    ).fetchall()
+    query = f"SELECT * FROM {TABLE} ORDER BY created_at DESC, id DESC"
+    params: tuple[int, ...] = ()
+    if limit is not None:
+        query += " LIMIT ?"
+        params = (limit,)
+    rows = db.execute(query, params).fetchall()
     return [_row_to_recipe(r) for r in rows]
 
 
