@@ -1,11 +1,32 @@
 """Hard-coded list of ingredients whose calorie contribution is treated as zero."""
 
 NEGLIGIBLE_INGREDIENTS: frozenset[str] = frozenset({
-    "water",
-    "salt",
-    "pepper",
+    "bay leaf",
+    "bay leaves",
     "black pepper",
+    "boiling water",
+    "cayenne pepper",
+    "chives",
+    "cold water",
+    "crushed red pepper flakes",
+    "dried chives",
+    "dried parsley",
+    "fresh parsley",
+    "freshly ground black pepper",
+    "flaky sea salt",
+    "ground black pepper",
+    "hot water",
+    "ice water",
+    "kosher salt",
     "parsley",
+    "pepper",
+    "red pepper flakes",
+    "salt",
+    "sea salt",
+    "table salt",
+    "warm water",
+    "water",
+    "white pepper",
 })
 
 
