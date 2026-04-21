@@ -215,20 +215,7 @@ app/
   static/css/app.css       # Minimal custom styles
 data/                      # SQLite database lives here (bind-mounted)
 tests/                     # Pytest suite
-exploration/               # Original CLI extraction scripts (reference)
 compose.yml                # Shared Compose settings
 compose.dev.yml            # Local development + test overrides
 compose.prod.yml           # Production VM overrides
-```
-
-## Exploration scripts
-
-The original CLI scripts are preserved in `exploration/` for reference. See `exploration/requirements.txt` for their dependencies.
-
-```bash
-# Extract from URL
-python exploration/extract_anthropic.py https://example.com/my-recipe
-
-# Extract from image
-python exploration/extract_image_anthropic.py recipe.jpg
 ```
