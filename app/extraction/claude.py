@@ -139,6 +139,34 @@ def extract_from_image(file_bytes: bytes, filename: str) -> Recipe:
     return _parse_recipe(payload)
 
 
+def extract_from_text(content: str, source_label: str) -> Recipe:
+    """Extract a recipe from user-supplied plain text via Claude."""
+    logger.info(
+        "Extracting recipe from text (%s, %d chars)", source_label, len(content)
+    )
+
+    try:
+        payload = _call_claude([
+            {
+                "role": "user",
+                "content": (
+                    "The following is recipe text supplied by the user (typed "
+                    "directly or read from a .txt/.md file). Extract the recipe "
+                    "and call the extract_recipe tool with the structured data. "
+                    "If the text contains commentary, headings, or unrelated "
+                    "material, ignore it and focus only on the recipe.\n\n"
+                    f"{content}"
+                ),
+            }
+        ])
+    except ExtractionError:
+        raise
+    except Exception as e:
+        raise ExtractionError(f"Claude API call failed: {e}") from e
+
+    return _parse_recipe(payload)
+
+
 def edit_recipe(recipe: Recipe, instruction: str) -> EditedRecipe:
     """Apply a natural-language edit to a structured recipe."""
     recipe_json = json.dumps(recipe.model_dump(mode="json"), indent=2, sort_keys=True)

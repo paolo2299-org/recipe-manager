@@ -103,6 +103,7 @@ class TestAdd:
         assert response.status_code == 200
         assert b'href="/recipes/add/from-link"' in response.data
         assert b'href="/recipes/add/from-photo"' in response.data
+        assert b'href="/recipes/add/from-text"' in response.data
         assert b'href="/recipes/add/idea"' in response.data
 
     def test_add_from_link_page_renders(self, client):
@@ -118,6 +119,14 @@ class TestAdd:
         assert response.status_code == 200
         assert b'hx-post="/recipes/extract/image"' in response.data
         assert b'name="image"' in response.data
+
+    def test_add_from_text_page_renders(self, client):
+        response = client.get("/recipes/add/from-text")
+
+        assert response.status_code == 200
+        assert b'hx-post="/recipes/extract/text"' in response.data
+        assert b'name="text_file"' in response.data
+        assert b'name="text"' in response.data
 
     def test_add_idea_page_renders(self, client):
         response = client.get("/recipes/add/idea")
@@ -198,6 +207,136 @@ class TestExtractImage:
 
         assert response.status_code == 200
         assert b"Bad image" in response.data
+
+
+class TestExtractText:
+    @patch("app.routes.recipes.extract_from_text")
+    def test_paste_success(self, mock_extract, client):
+        mock_extract.return_value = _sample_recipe_model()
+
+        response = client.post(
+            "/recipes/extract/text",
+            data={"text": "  Title\n2 cups flour\nMix and bake.  "},
+        )
+
+        assert response.status_code == 200
+        assert b"Test Cookies" in response.data
+        assert b"Save to Collection" in response.data
+        mock_extract.assert_called_once_with(
+            "Title\n2 cups flour\nMix and bake.", "pasted text"
+        )
+
+    @patch("app.routes.recipes.extract_from_text")
+    def test_file_success(self, mock_extract, client):
+        mock_extract.return_value = _sample_recipe_model()
+
+        response = client.post(
+            "/recipes/extract/text",
+            data={"text_file": (io.BytesIO(b"Title\n2 cups flour\nMix."), "recipe.txt")},
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200
+        assert b"Test Cookies" in response.data
+        assert b"Save to Collection" in response.data
+        mock_extract.assert_called_once_with(
+            "Title\n2 cups flour\nMix.", "recipe.txt"
+        )
+
+    @patch("app.routes.recipes.extract_from_text")
+    def test_md_extension_accepted(self, mock_extract, client):
+        mock_extract.return_value = _sample_recipe_model()
+
+        response = client.post(
+            "/recipes/extract/text",
+            data={"text_file": (io.BytesIO(b"# Recipe\n\n- 1 cup sugar"), "recipe.md")},
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200
+        assert b"Test Cookies" in response.data
+
+    @patch("app.routes.recipes.extract_from_text")
+    def test_file_wins_over_paste(self, mock_extract, client):
+        mock_extract.return_value = _sample_recipe_model()
+
+        response = client.post(
+            "/recipes/extract/text",
+            data={
+                "text_file": (io.BytesIO(b"FROM-FILE"), "from-file.txt"),
+                "text": "FROM-PASTE",
+            },
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200
+        mock_extract.assert_called_once_with("FROM-FILE", "from-file.txt")
+
+    def test_both_empty_error(self, client):
+        response = client.post("/recipes/extract/text", data={"text": "   "})
+
+        assert response.status_code == 200
+        assert b"Please upload a text file or paste recipe text." in response.data
+
+    def test_invalid_extension(self, client):
+        response = client.post(
+            "/recipes/extract/text",
+            data={"text_file": (io.BytesIO(b"x"), "recipe.pdf")},
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200
+        assert b"Only .txt and .md files are supported." in response.data
+
+    def test_file_too_large(self, client):
+        oversized = b"x" * (1_000_000 + 1)
+        response = client.post(
+            "/recipes/extract/text",
+            data={"text_file": (io.BytesIO(oversized), "big.txt")},
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200
+        assert b"File is too large" in response.data
+
+    def test_empty_file(self, client):
+        response = client.post(
+            "/recipes/extract/text",
+            data={"text_file": (io.BytesIO(b"   \n"), "empty.txt")},
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200
+        assert b"File appears to be empty." in response.data
+
+    @patch("app.routes.recipes.extract_from_text")
+    def test_extraction_error(self, mock_extract, client):
+        from app.extraction.claude import ExtractionError
+
+        mock_extract.side_effect = ExtractionError("Could not parse recipe")
+
+        response = client.post(
+            "/recipes/extract/text",
+            data={"text": "some recipe text"},
+        )
+
+        assert response.status_code == 200
+        assert b"Could not parse recipe" in response.data
+
+    @patch("app.routes.recipes.extract_from_text")
+    def test_latin1_fallback(self, mock_extract, client):
+        mock_extract.return_value = _sample_recipe_model()
+
+        response = client.post(
+            "/recipes/extract/text",
+            data={"text_file": (io.BytesIO(b"caf\xe9 recipe\n1 cup sugar"), "cafe.txt")},
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200
+        mock_extract.assert_called_once_with(
+            "café recipe\n1 cup sugar", "cafe.txt"
+        )
 
 
 class TestSave:
