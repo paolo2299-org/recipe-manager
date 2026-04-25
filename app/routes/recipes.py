@@ -21,6 +21,7 @@ from app.extraction.claude import (
     ExtractionError,
     edit_recipe,
     extract_from_image,
+    extract_from_text,
     extract_from_url,
     prefill_calories,
 )
@@ -52,6 +53,9 @@ from app.storage.recipes import (
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("recipes", __name__)
+
+MAX_TEXT_BYTES = 1_000_000
+ALLOWED_TEXT_EXTENSIONS = (".txt", ".md")
 
 
 def _get_idea_or_404(recipe_id: str) -> Recipe:
@@ -389,6 +393,11 @@ def add_from_photo() -> str:
     return render_template("add_from_photo.html")
 
 
+@bp.route("/recipes/add/from-text")
+def add_from_text() -> str:
+    return render_template("add_from_text.html")
+
+
 @bp.route("/recipes/add/idea")
 def add_idea() -> str:
     return render_template(
@@ -437,6 +446,66 @@ def extract_image() -> str:
         )
     except ExtractionError as e:
         logger.exception("Image extraction failed")
+        return render_template("partials/extraction_error.html", error=str(e))
+
+
+@bp.route("/recipes/extract/text", methods=["POST"])
+def extract_text() -> str:
+    file = request.files.get("text_file")
+    pasted = request.form.get("text", "")
+
+    if file and file.filename:
+        filename = file.filename
+        if not filename.lower().endswith(ALLOWED_TEXT_EXTENSIONS):
+            return render_template(
+                "partials/extraction_error.html",
+                error="Only .txt and .md files are supported.",
+            )
+        raw = file.read()
+        if len(raw) > MAX_TEXT_BYTES:
+            return render_template(
+                "partials/extraction_error.html",
+                error="File is too large (max 1 MB).",
+            )
+        try:
+            decoded = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            logger.debug("UTF-8 decode failed for %s; falling back to latin-1", filename)
+            decoded = raw.decode("latin-1")
+        content = decoded.strip()
+        if not content:
+            return render_template(
+                "partials/extraction_error.html",
+                error="File appears to be empty.",
+            )
+        source_ref = filename
+        source_label = filename
+    elif pasted.strip():
+        if len(pasted.encode("utf-8")) > MAX_TEXT_BYTES:
+            return render_template(
+                "partials/extraction_error.html",
+                error="Pasted text is too large (max 1 MB).",
+            )
+        content = pasted.strip()
+        source_ref = ""
+        source_label = "pasted text"
+    else:
+        return render_template(
+            "partials/extraction_error.html",
+            error="Please upload a text file or paste recipe text.",
+        )
+
+    try:
+        recipe = extract_from_text(content, source_label)
+        return render_template(
+            "partials/extraction_result.html",
+            recipe=recipe,
+            recipe_json=recipe.model_dump_json(),
+            source_type="text",
+            source_ref=source_ref,
+        )
+    except ExtractionError as e:
+        logger.exception("Text extraction failed")
         return render_template("partials/extraction_error.html", error=str(e))
 
 
