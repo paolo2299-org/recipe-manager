@@ -30,15 +30,8 @@ class Config:
     GOOGLE_ALLOWED_EMAILS = parse_email_allowlist(
         os.environ.get("GOOGLE_ALLOWED_EMAILS", "")
     )
-    HELICONE_ENABLED = os.environ.get("HELICONE_ENABLED", "false").lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    HELICONE_BASE_URL = os.environ.get("HELICONE_BASE_URL", "")
-    HELICONE_API_KEY = os.environ.get("HELICONE_API_KEY", "")
-    HELICONE_APP_NAME = os.environ.get("HELICONE_APP_NAME", "recipe-manager")
+    HONEYCOMB_API_KEY = os.environ.get("HONEYCOMB_API_KEY", "")
+    OTEL_SERVICE_NAME = os.environ.get("OTEL_SERVICE_NAME", "recipe-manager")
 
 
 class DevelopmentConfig(Config):

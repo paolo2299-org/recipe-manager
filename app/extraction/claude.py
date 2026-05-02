@@ -2,10 +2,10 @@
 
 import json
 import logging
-import os
 from typing import Any
 
 import anthropic
+from opentelemetry import trace
 from pydantic import ValidationError
 
 from app.schemas.calorie import CalorieEntry, MissingCalorie, PrefilledCalories
@@ -16,6 +16,7 @@ from .jina import fetch_via_jina
 from .schema import EDIT_RECIPE_TOOL, EXTRACT_RECIPE_TOOL, FILL_CALORIES_TOOL
 
 logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 
 class ExtractionError(Exception):
@@ -23,35 +24,8 @@ class ExtractionError(Exception):
     pass
 
 
-def _is_truthy(value: str | None) -> bool:
-    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _build_anthropic_client() -> anthropic.Anthropic:
-    kwargs: dict[str, Any] = {}
-    if _is_truthy(os.environ.get("HELICONE_ENABLED")):
-        base_url = (os.environ.get("HELICONE_BASE_URL") or "").strip()
-        if not base_url:
-            raise ExtractionError(
-                "Helicone is enabled but HELICONE_BASE_URL is empty."
-            )
-
-        headers: dict[str, str] = {}
-        helicone_api_key = (os.environ.get("HELICONE_API_KEY") or "").strip()
-        if helicone_api_key:
-            headers["Helicone-Auth"] = f"Bearer {helicone_api_key}"
-
-        helicone_app_name = (os.environ.get("HELICONE_APP_NAME") or "").strip()
-        if helicone_app_name:
-            headers["Helicone-Property-App"] = helicone_app_name
-
-        kwargs["base_url"] = base_url.rstrip("/")
-        if headers:
-            kwargs["default_headers"] = headers
-
-        logger.info("Using Helicone for Anthropic API calls via %s", kwargs["base_url"])
-
-    return anthropic.Anthropic(**kwargs)
+    return anthropic.Anthropic()
 
 
 def _call_claude_tool(
@@ -59,29 +33,36 @@ def _call_claude_tool(
 ) -> dict[str, Any]:
     """Send messages to Claude with forced tool use and return the tool payload."""
     tool_name = tool["name"]
-    client = _build_anthropic_client()
-    response = client.messages.create(  # type: ignore[call-overload]
-        model="claude-sonnet-4-6",
-        max_tokens=4096,
-        tools=[tool],
-        tool_choice={"type": "tool", "name": tool_name},
-        messages=messages,
-    )
+    with tracer.start_as_current_span("claude.tool_call") as span:
+        span.set_attribute("llm.model", "claude-sonnet-4-6")
+        span.set_attribute("llm.tool", tool_name)
 
-    for block in response.content:
-        if block.type == "tool_use" and block.name == tool_name:
-            logger.info(
-                "Claude tool %s complete. Input tokens: %d, output tokens: %d",
-                tool_name,
-                response.usage.input_tokens,
-                response.usage.output_tokens,
-            )
-            payload = block.input
-            if not isinstance(payload, dict):
-                raise ExtractionError(
-                    f"Tool {tool_name} returned a non-object payload"
+        client = _build_anthropic_client()
+        response = client.messages.create(  # type: ignore[call-overload]
+            model="claude-sonnet-4-6",
+            max_tokens=4096,
+            tools=[tool],
+            tool_choice={"type": "tool", "name": tool_name},
+            messages=messages,
+        )
+
+        span.set_attribute("llm.usage.input_tokens", response.usage.input_tokens)
+        span.set_attribute("llm.usage.output_tokens", response.usage.output_tokens)
+
+        for block in response.content:
+            if block.type == "tool_use" and block.name == tool_name:
+                logger.info(
+                    "Claude tool %s complete. Input tokens: %d, output tokens: %d",
+                    tool_name,
+                    response.usage.input_tokens,
+                    response.usage.output_tokens,
                 )
-            return payload
+                payload = block.input
+                if not isinstance(payload, dict):
+                    raise ExtractionError(
+                        f"Tool {tool_name} returned a non-object payload"
+                    )
+                return payload
 
     raise ExtractionError(f"Model did not call the {tool_name} tool")
 
