@@ -33,6 +33,17 @@ SECRET_KEY=change-me-in-production
 
 Set `GOOGLE_ALLOWED_EMAILS` to a comma-separated list of the exact Google account emails that should have access.
 
+Optional Helicone settings (for self-hosted deployments):
+
+```dotenv
+HELICONE_ENABLED=true
+HELICONE_BASE_URL=http://helicone:8585/v1
+HELICONE_API_KEY=optional_helicone_api_key
+HELICONE_APP_NAME=recipe-manager
+```
+
+When enabled, the app sends Anthropic API traffic to `HELICONE_BASE_URL` and includes `Helicone-Auth` when `HELICONE_API_KEY` is set.
+
 ### 2. Create a Google OAuth client
 
 Create a Google OAuth 2.0 Web application client in Google Cloud and add this authorized redirect URI for local dev:
@@ -101,6 +112,14 @@ GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 GOOGLE_ALLOWED_EMAILS=chef@example.com
 IMAGE_NAME=ghcr.io/your-github-user/your-repo-name
+```
+
+If Helicone runs as another service on the same Docker network in production, also set:
+
+```dotenv
+HELICONE_ENABLED=true
+HELICONE_BASE_URL=http://helicone:8585/v1
+HELICONE_API_KEY=optional_helicone_api_key
 ```
 
 Create the shared Docker network if it does not already exist:

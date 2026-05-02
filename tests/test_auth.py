@@ -180,3 +180,16 @@ class TestStartupValidation:
                     "DATABASE_PATH": str(tmp_path / "auth-test.db"),
                 }
             )
+
+    def test_helicone_requires_base_url_when_enabled(self, tmp_path):
+        with pytest.raises(RuntimeError, match="HELICONE_BASE_URL"):
+            create_app(
+                {
+                    "TESTING": False,
+                    "SECRET_KEY": "auth-test-secret",
+                    "GOOGLE_AUTH_ENABLED": False,
+                    "HELICONE_ENABLED": True,
+                    "HELICONE_BASE_URL": "",
+                    "DATABASE_PATH": str(tmp_path / "auth-test.db"),
+                }
+            )

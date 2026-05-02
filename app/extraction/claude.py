@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from typing import Any
 
 import anthropic
@@ -22,12 +23,43 @@ class ExtractionError(Exception):
     pass
 
 
+def _is_truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _build_anthropic_client() -> anthropic.Anthropic:
+    kwargs: dict[str, Any] = {}
+    if _is_truthy(os.environ.get("HELICONE_ENABLED")):
+        base_url = (os.environ.get("HELICONE_BASE_URL") or "").strip()
+        if not base_url:
+            raise ExtractionError(
+                "Helicone is enabled but HELICONE_BASE_URL is empty."
+            )
+
+        headers: dict[str, str] = {}
+        helicone_api_key = (os.environ.get("HELICONE_API_KEY") or "").strip()
+        if helicone_api_key:
+            headers["Helicone-Auth"] = f"Bearer {helicone_api_key}"
+
+        helicone_app_name = (os.environ.get("HELICONE_APP_NAME") or "").strip()
+        if helicone_app_name:
+            headers["Helicone-Property-App"] = helicone_app_name
+
+        kwargs["base_url"] = base_url.rstrip("/")
+        if headers:
+            kwargs["default_headers"] = headers
+
+        logger.info("Using Helicone for Anthropic API calls via %s", kwargs["base_url"])
+
+    return anthropic.Anthropic(**kwargs)
+
+
 def _call_claude_tool(
     messages: list[dict[str, Any]], tool: dict[str, Any]
 ) -> dict[str, Any]:
     """Send messages to Claude with forced tool use and return the tool payload."""
     tool_name = tool["name"]
-    client = anthropic.Anthropic()
+    client = _build_anthropic_client()
     response = client.messages.create(  # type: ignore[call-overload]
         model="claude-sonnet-4-6",
         max_tokens=4096,

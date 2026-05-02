@@ -1,5 +1,6 @@
 """Tests for app.extraction.claude — Claude extraction orchestration."""
 
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from app.extraction.claude import (
     ExtractionError,
     _call_claude,
+    _build_anthropic_client,
     extract_from_image,
     extract_from_url,
     prefill_calories,
@@ -60,6 +62,46 @@ class TestCallClaude:
 
         with pytest.raises(ExtractionError, match="did not call"):
             _call_claude([{"role": "user", "content": "test"}])
+
+
+class TestBuildAnthropicClient:
+    @patch.dict(os.environ, {}, clear=True)
+    @patch("app.extraction.claude.anthropic.Anthropic")
+    def test_default_client_without_helicone(self, mock_anthropic_cls):
+        _build_anthropic_client()
+        mock_anthropic_cls.assert_called_once_with()
+
+    @patch.dict(
+        os.environ,
+        {
+            "HELICONE_ENABLED": "true",
+            "HELICONE_BASE_URL": "http://helicone:8080/v1",
+            "HELICONE_API_KEY": "test-key",
+            "HELICONE_APP_NAME": "recipe-manager-dev",
+        },
+        clear=True,
+    )
+    @patch("app.extraction.claude.anthropic.Anthropic")
+    def test_helicone_client_with_headers(self, mock_anthropic_cls):
+        _build_anthropic_client()
+        mock_anthropic_cls.assert_called_once_with(
+            base_url="http://helicone:8080/v1",
+            default_headers={
+                "Helicone-Auth": "Bearer test-key",
+                "Helicone-Property-App": "recipe-manager-dev",
+            },
+        )
+
+    @patch.dict(
+        os.environ,
+        {
+            "HELICONE_ENABLED": "true",
+        },
+        clear=True,
+    )
+    def test_helicone_missing_base_url_raises(self):
+        with pytest.raises(ExtractionError, match="HELICONE_BASE_URL is empty"):
+            _build_anthropic_client()
 
 
 class TestExtractFromUrl:

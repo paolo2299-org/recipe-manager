@@ -43,6 +43,17 @@ def validate_google_auth_config(app: Flask) -> None:
         )
 
 
+def validate_helicone_config(app: Flask) -> None:
+    if not app.config.get("HELICONE_ENABLED") or app.config.get("TESTING"):
+        return
+
+    if not app.config.get("HELICONE_BASE_URL"):
+        raise RuntimeError(
+            "Helicone is enabled, but HELICONE_BASE_URL is empty. "
+            "Set HELICONE_BASE_URL in your environment or .env file."
+        )
+
+
 def create_app(test_config: dict[str, object] | None = None) -> Flask:
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)  # type: ignore[method-assign]
@@ -58,6 +69,7 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
 
     validate_secret_key_config(app)
     validate_google_auth_config(app)
+    validate_helicone_config(app)
 
     from app.storage.db import init_db
     init_db(app)
