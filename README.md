@@ -1,80 +1,73 @@
 # Recipe Manager
 
-A web application for extracting and saving structured recipe data from photos and URLs using the Claude API.
+A web application for extracting and saving structured recipe data from photos, URLs,
+and pasted text using the Claude API.
 
-## Overview
+Upload a photo of a recipe or paste a URL, and the app uses Claude to extract structured
+information — title, ingredients, steps, timings, and tags — plus optional per-serving
+calorie estimates. You can also save lightweight recipe ideas with just a name, notes, and
+tags. Everything is stored in a SQLite database and can be browsed, viewed, and deleted.
 
-Upload a photo of a recipe or paste a URL, and the app uses Claude to extract structured information — title, ingredients, steps, timings, and tags. You can also save lightweight recipe ideas with just a name, notes, and tags. Entries are stored in a local SQLite database and can be browsed, viewed, and deleted.
+## Deploy it (easiest) — Railway
 
-## Prerequisites
+<!-- Replace XXXXXX with the published template ID — see docs/railway-template.md -->
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/XXXXXX)
 
-- Docker
-- Docker Compose (`docker compose`)
-- An [Anthropic API key](https://console.anthropic.com/)
-- A Google OAuth web client for sign-in
+1. Get an [Anthropic API key](https://console.anthropic.com/) (you'll need an Anthropic
+   account with billing set up — the key is the only thing you have to fetch).
+2. Click the **Deploy on Railway** button above.
+3. When prompted, paste your Anthropic API key and choose a password (the username defaults
+   to `admin`). Click deploy.
 
-## Setup
+Railway gives you a URL when it's done — open it, log in, and start adding recipes.
 
-### 1. Configure environment
+Cost: roughly **$5/month** on Railway's Hobby plan. The Anthropic API is billed separately
+on your own account, pay-per-use (a few cents per recipe extraction).
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and set at minimum:
-
-```
-ANTHROPIC_API_KEY=your_key_here
-GOOGLE_CLIENT_ID=your_google_oauth_client_id
-GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
-GOOGLE_ALLOWED_EMAILS=user@example.com
-SECRET_KEY=change-me-in-production
-```
-
-Set `GOOGLE_ALLOWED_EMAILS` to a comma-separated list of the exact Google account emails that should have access.
-
-Optional Helicone settings (for self-hosted deployments):
-
-```dotenv
-HELICONE_ENABLED=true
-HELICONE_BASE_URL=http://helicone:8585/v1
-HELICONE_API_KEY=optional_helicone_api_key
-HELICONE_APP_NAME=recipe-manager
-```
-
-When enabled, the app sends Anthropic API traffic to `HELICONE_BASE_URL` and includes `Helicone-Auth` when `HELICONE_API_KEY` is set.
-
-### 2. Create a Google OAuth client
-
-Create a Google OAuth 2.0 Web application client in Google Cloud and add this authorized redirect URI for local dev:
-
-- `http://localhost:8080/auth/google/callback`
-
-The app uses Google OpenID Connect for sign-in and only allows emails listed in `GOOGLE_ALLOWED_EMAILS`.
-
-## Database
-
-Recipes are stored in a SQLite file at `data/recipes.db` by default. Under Docker Compose, the app is configured to use `/app/data/recipes.db` inside the container so both local and production mounts land in the same place. The schema is created automatically on startup. In local dev the `data/` directory is bind-mounted into the container, so data survives `make down` / `make dev` cycles.
-
-To use a different path, set `DATABASE_PATH` in your `.env`.
-
-## Running locally
+## Run it locally
 
 ```bash
+cp .env.example .env       # then set ANTHROPIC_API_KEY and SECRET_KEY
 make dev
 ```
 
 The app is available at `http://localhost:8080` with Flask hot reload enabled.
 
-Useful local commands:
+Useful commands:
 
-- `make dev` starts the app.
-- `make test` runs the pytest suite inside Docker.
-- `make shell` opens a shell inside the running app container.
-- `make down` stops and removes the local containers.
+- `make dev` — start the app
+- `make test` — run the pytest suite inside Docker
+- `make typecheck` — run mypy
+- `make shell` — open a shell inside the running app container
+- `make down` — stop and remove the local containers
 
-If `.env` is not present yet, the `make` targets automatically fall back to `.env.example` so teardown and config validation still work in a fresh checkout. To actually run the app against real credentials, copy `.env.example` to `.env` and fill in the secrets.
-```
+If `.env` is missing, the `make` targets fall back to `.env.example` so config validation
+and teardown still work in a fresh checkout. To run against real credentials, copy
+`.env.example` to `.env` and fill in the secrets.
+
+## Configuration
+
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | yes | used for all Claude extraction features |
+| `SECRET_KEY` | yes in production | must be a non-default value when `FLASK_ENV=production` |
+| `AUTH_ENABLED` | no (default `true`) | when true, the app requires login |
+| `AUTH_USERNAME` / `AUTH_PASSWORD` | yes if auth is enabled | the single login account |
+| `FLASK_ENV` | no | `development` (default) or `production` |
+| `DATABASE_PATH` | no | SQLite file path; defaults to `/app/data/recipes.db` in the container |
+| `HONEYCOMB_API_KEY` | no | enables OpenTelemetry tracing to Honeycomb if set |
+| `OTEL_SERVICE_NAME` | no | defaults to `recipe-manager` |
+| `HELICONE_ENABLED` / `HELICONE_BASE_URL` / `HELICONE_API_KEY` | no | route Anthropic traffic through a Helicone proxy |
+
+Authentication is a single username/password (set via `AUTH_USERNAME` / `AUTH_PASSWORD`).
+There is no multi-user support or external identity provider.
+
+## Database
+
+Recipes are stored in a SQLite file at `/app/data/recipes.db` inside the container (override
+with `DATABASE_PATH`). The schema is created automatically on startup. In local dev the
+`data/` directory is bind-mounted into the container, so data survives `make down` / `make dev`
+cycles; on Railway the same path is backed by a persistent volume.
 
 ## Running tests
 
@@ -82,136 +75,13 @@ If `.env` is not present yet, the `make` targets automatically fall back to `.en
 make test
 ```
 
-The test suite runs inside Docker. External services are mocked, and each test gets an isolated SQLite database under a temp directory.
+The suite runs inside Docker. External services are mocked, and each test gets an isolated
+SQLite database under a temp directory.
 
-## Production on a VM
+## Self-hosting on your own server
 
-The production Compose overlay is designed for a single-VM setup where only Caddy publishes public ports and the Flask app stays private on a shared Docker network.
-
-Install Docker and the Compose plugin on the VM, then create the app and data directories:
-
-```bash
-sudo install -d -o deploy -g deploy -m 0755 /srv/recipe-manager /srv/recipe-manager/app /srv/recipe-manager/data
-```
-
-Clone this repo onto the VM under `/srv/recipe-manager/app`, so the checked-out repo lives at `/srv/recipe-manager/app/recipe-manager` and the Flask package lives at `/srv/recipe-manager/app/recipe-manager/app`:
-
-```bash
-cd /srv/recipe-manager/app
-git clone git@github.com:YOUR_GITHUB_USER/recipe-organizer.git
-```
-
-Create a production `.env` file at `/srv/recipe-manager/app/recipe-manager/.env` with your real secrets:
-
-```dotenv
-ANTHROPIC_API_KEY=your_real_key
-SECRET_KEY=a_long_random_secret
-FLASK_ENV=production
-GOOGLE_AUTH_ENABLED=true
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_ALLOWED_EMAILS=chef@example.com
-IMAGE_NAME=ghcr.io/your-github-user/your-repo-name
-```
-
-If Helicone runs as another service on the same Docker network in production, also set:
-
-```dotenv
-HELICONE_ENABLED=true
-HELICONE_BASE_URL=http://helicone:8585/v1
-HELICONE_API_KEY=optional_helicone_api_key
-```
-
-Create the shared Docker network if it does not already exist:
-
-```bash
-docker network create web
-```
-
-The production service joins the external Docker network `web`, stores SQLite data under `/srv/recipe-manager/data`, and does not publish port `8080` directly.
-
-Add a Caddy route that proxies to the internal service name:
-
-```caddy
-recipes.example.com {
-	reverse_proxy recipe-manager:8080
-}
-```
-
-To start or manually update the production stack from the checked-out repo on the VM:
-
-```bash
-cd /srv/recipe-manager/app/recipe-manager
-docker compose -f compose.yml -f compose.prod.yml pull
-docker compose -f compose.yml -f compose.prod.yml up -d
-```
-
-If you prefer using the Make targets from the checked-out repo, the production helpers are:
-
-- `make prod-start` starts the app with the production Compose overlay.
-- `make prod-stop` stops the production app container without removing it.
-- `make prod-restart` restarts the production app container.
-
-### Automatic deploys from GitHub to a VM
-
-This repo includes a GitHub Actions workflow at `.github/workflows/deploy.yml` that:
-
-- runs `make test`
-- builds a Docker image
-- pushes it to GitHub Container Registry (GHCR)
-- SSHes into your production VM
-- pulls the exact image for the merged commit
-- restarts the app with Docker Compose
-
-The workflow triggers on pushes to `main`, which means merges into `main` deploy automatically.
-
-Assuming the VM is already set up as described above, these are the extra steps for automatic deployment.
-
-#### 1. Set the image name
-
-Set `IMAGE_NAME` in `/srv/recipe-manager/app/recipe-manager/.env` so Compose pulls the correct GHCR image:
-
-```dotenv
-IMAGE_NAME=ghcr.io/your-github-user/your-repo-name
-```
-
-#### 2. Give the VM permission to pull from GHCR
-
-If the repository or package is private, create a GitHub personal access token with at least `read:packages`. Add these repository secrets in GitHub:
-
-- `GHCR_USERNAME`
-- `GHCR_TOKEN`
-
-If the package is public, you can leave those two secrets unset and the VM can pull anonymously.
-
-#### 3. Add deployment secrets to GitHub
-
-Add these repository secrets for the SSH step:
-
-- `DEPLOY_HOST`
-- `DEPLOY_USER`
-- `DEPLOY_SSH_KEY`
-
-Optional:
-
-- `DEPLOY_PORT` if you do not use port `22`
-
-The SSH key should be the private key for a deploy user that can run Docker Compose on the VM.
-
-#### 4. Enable the workflow
-
-After those secrets are in place, merges into `main` will publish a new image and restart the app automatically.
-
-#### 5. Rollback
-
-Because the workflow deploys the image tagged with the Git commit SHA, rollback is simple: set `IMAGE_TAG` to an older commit SHA on the VM and rerun Compose.
-
-```bash
-cd /srv/recipe-manager/app/recipe-manager
-export IMAGE_TAG=<older-commit-sha>
-docker compose -f compose.yml -f compose.prod.yml pull
-docker compose -f compose.yml -f compose.prod.yml up -d
-```
+The maintainer runs this on a single VM with Docker Compose behind a Caddy reverse proxy,
+with an optional GitHub Actions auto-deploy pipeline. See **[docs/self-hosting.md](docs/self-hosting.md)**.
 
 ## Project structure
 
@@ -224,17 +94,22 @@ app/
     jina.py                # URL content fetching via Jina Reader
     image.py               # Image preparation (resize/compress for Claude)
     claude.py              # Claude extraction orchestration
+  calories/                # Per-serving calorie calculation + breakdowns
+  schemas/                 # Pydantic models (recipes, calories, forms)
   storage/
     db.py                  # SQLite connection + schema init
     recipes.py             # Recipe CRUD operations
+    calories.py            # Calorie lookup CRUD
   routes/
-    auth.py                # Google OAuth routes and auth gate
-    recipes.py             # Flask blueprint with all routes
+    auth.py                # Username/password auth gate
+    recipes.py             # Flask blueprint with all routes (+ /health)
   templates/               # Jinja2 templates (Pico CSS + HTMX)
   static/css/app.css       # Minimal custom styles
-data/                      # SQLite database lives here (bind-mounted)
+data/                      # SQLite database lives here (bind-mounted / volume)
 tests/                     # Pytest suite
 compose.yml                # Shared Compose settings
 compose.dev.yml            # Local development + test overrides
-compose.prod.yml           # Production VM overrides
+compose.prod.yml           # Self-hosted VM overrides
+railway.toml               # Railway build/deploy config
+docs/                      # Self-hosting + Railway template guides
 ```

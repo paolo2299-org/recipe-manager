@@ -48,6 +48,12 @@ class TestAuthGuard:
         assert response.status_code == 401
         assert response.headers["HX-Redirect"] == "/login"
 
+    def test_health_endpoint_is_public(self, auth_client):
+        response = auth_client.get("/health")
+
+        assert response.status_code == 200
+        assert response.data == b"ok"
+
 
 class TestLoginFlow:
     def test_valid_credentials_log_in(self, auth_client):

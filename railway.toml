@@ -1,0 +1,16 @@
+# Railway deployment config. See docs/railway-template.md for how the
+# one-click "Deploy on Railway" template is set up.
+#
+# Note: numReplicas must stay at 1 — the app uses SQLite on a single mounted
+# volume, which must not be written by more than one instance.
+
+[build]
+builder = "dockerfile"
+
+[deploy]
+startCommand = "gunicorn --bind :$PORT --workers 4 --threads 2 --timeout 120 \"app:create_app()\""
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+numReplicas = 1
