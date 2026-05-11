@@ -10,8 +10,7 @@ tags. Everything is stored in a SQLite database and can be browsed, viewed, and 
 
 ## Deploy it (easiest) — Railway
 
-<!-- Replace XXXXXX with the published template ID — see docs/railway-template.md -->
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/XXXXXX)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.com/deploy/kqrBFL)
 
 1. Get an [Anthropic API key](https://console.anthropic.com/) (you'll need an Anthropic
    account with billing set up — the key is the only thing you have to fetch).
