@@ -58,6 +58,11 @@ MAX_TEXT_BYTES = 1_000_000
 ALLOWED_TEXT_EXTENSIONS = (".txt", ".md")
 
 
+@bp.route("/health")
+def health() -> tuple[str, int]:
+    return "ok", 200
+
+
 def _get_idea_or_404(recipe_id: str) -> Recipe:
     recipe = get_recipe(recipe_id)
     if recipe is None or recipe.record_type != RECORD_TYPE_IDEA:

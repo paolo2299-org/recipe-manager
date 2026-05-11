@@ -2,6 +2,7 @@
 .git
 .venv
 venv
+data/
 exploration/
 __pycache__
 *.pyc

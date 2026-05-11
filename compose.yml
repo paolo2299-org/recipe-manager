@@ -4,5 +4,5 @@ services:
     env_file:
       - ${ENV_FILE:-.env}
     environment:
-      DATABASE_PATH: /app/data/recipes.db
+      # DATABASE_PATH defaults to /app/data/recipes.db (set in the Dockerfile).
       PORT: 8080

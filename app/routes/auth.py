@@ -16,7 +16,7 @@ from flask import (
 
 bp = Blueprint("auth", __name__)
 
-EXEMPT_ENDPOINTS = {"auth.login", "static"}
+EXEMPT_ENDPOINTS = {"auth.login", "static", "recipes.health"}
 
 
 def auth_enabled():
