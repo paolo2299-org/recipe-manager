@@ -11,6 +11,11 @@ Dockerfile) is already in place; this doc covers the ~10-minute one-time setup.
 On Railway: **New Project → Deploy from GitHub repo →** pick this repo. Railway
 detects the `Dockerfile` / `railway.toml` and builds from it.
 
+Leave the service start command alone. This repo intentionally starts from the
+`Dockerfile` `CMD`; overriding it in Railway with `gunicorn ... $PORT` causes
+Railway to run the command in exec form, so `$PORT` is passed through literally
+instead of being expanded.
+
 ## 2. Add a volume
 
 Add a **Volume** to the service, mounted at:

@@ -8,7 +8,9 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "gunicorn --bind :$PORT --workers 4 --threads 2 --timeout 120 \"app:create_app()\""
+# Do not set startCommand here. For Dockerfile deployments Railway runs a
+# custom start command in exec form, which does not expand $PORT. We rely on
+# the Dockerfile CMD instead so the shell can expand Railway's injected port.
 healthcheckPath = "/health"
 healthcheckTimeout = 100
 restartPolicyType = "on_failure"
