@@ -23,7 +23,7 @@
                         <button type="submit" class="secondary">Sign Out</button>
                     </form>
                 </li>
-                {% elif google_auth_enabled and request.endpoint != 'auth.login' %}
+                {% elif auth_enabled and request.endpoint != 'auth.login' %}
                 <li><a href="{{ url_for('auth.login') }}">Sign In</a></li>
                 {% endif %}
             </ul>
