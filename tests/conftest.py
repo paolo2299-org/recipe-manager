@@ -46,7 +46,7 @@ def make_recipe(**overrides: Any) -> Recipe:
 def _test_config(tmp_path, **overrides):
     config = {
         "TESTING": True,
-        "GOOGLE_AUTH_ENABLED": False,
+        "AUTH_ENABLED": False,
         "SECRET_KEY": "test-secret-key",
         "DATABASE_PATH": str(tmp_path / "test.db"),
     }

@@ -20,5 +20,5 @@ disallow_untyped_defs = false
 check_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = ["anthropic.*", "google.*", "requests.*", "PIL.*"]
+module = ["anthropic.*", "requests.*", "PIL.*"]
 ignore_missing_imports = true

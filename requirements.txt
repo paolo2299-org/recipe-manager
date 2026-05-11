@@ -16,9 +16,6 @@ Pillow>=10.0.0
 # Validation
 pydantic>=2.6
 
-# Google OAuth (ID token verification)
-google-auth>=2.29.0
-
 # Config
 python-dotenv>=1.0.0
 

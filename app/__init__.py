@@ -20,26 +20,19 @@ def validate_secret_key_config(app: Flask) -> None:
         )
 
 
-def validate_google_auth_config(app: Flask) -> None:
-    if not app.config.get("GOOGLE_AUTH_ENABLED") or app.config.get("TESTING"):
+def validate_auth_config(app: Flask) -> None:
+    if not app.config.get("AUTH_ENABLED") or app.config.get("TESTING"):
         return
 
     missing = [
         key
-        for key in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET")
+        for key in ("AUTH_USERNAME", "AUTH_PASSWORD")
         if not app.config.get(key)
     ]
     if missing:
         joined = ", ".join(missing)
         raise RuntimeError(
-            f"Google auth is enabled, but these settings are missing: {joined}"
-        )
-
-    allowed_emails = app.config.get("GOOGLE_ALLOWED_EMAILS", frozenset())
-    if not allowed_emails:
-        raise RuntimeError(
-            "Google auth is enabled, but GOOGLE_ALLOWED_EMAILS is empty. "
-            "Set GOOGLE_ALLOWED_EMAILS in your environment or .env file."
+            f"Auth is enabled, but these settings are missing: {joined}"
         )
 
 
@@ -57,7 +50,7 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
         app.config.update(test_config)
 
     validate_secret_key_config(app)
-    validate_google_auth_config(app)
+    validate_auth_config(app)
 
     from app.storage.db import init_db
     init_db(app)
