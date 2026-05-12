@@ -12,7 +12,7 @@ A web application for extracting and saving structured recipe data from photos, 
 
 Railway gives you a URL when it's done — open it, log in, and start adding recipes.
 
-Cost: roughly **$5/month** on Railway's Hobby plan, plus a few cents per recipe extraction billed to your Anthropic account.
+Cost: **free** on Railway's free tier, plus a few cents per recipe extraction billed to your Anthropic account.
 
 ## More documentation
 
