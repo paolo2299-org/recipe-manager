@@ -6,7 +6,7 @@ An AI-powered web app for saving and managing all of your recipes in one place, 
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.com/deploy/kqrBFL)
 
-1. Get an [Anthropic API key](https://console.anthropic.com/) — this is the only thing you need to fetch.
+1. Get an [Anthropic API key](https://console.anthropic.com/)
 2. Click the button above.
 3. Paste your API key and choose a password when prompted. Click deploy.
 
