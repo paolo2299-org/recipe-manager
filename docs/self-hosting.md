@@ -6,8 +6,7 @@ optional GitHub Actions pipeline that builds an image and redeploys on every pus
 to `main`.
 
 If you just want the app running with the least possible effort, use the one-click
-[Railway deployment](../README.md#deploy-it-easiest--railway) instead — you don't
-need any of this.
+[Railway deployment](../README.md) instead — you don't need any of this.
 
 ## Prerequisites
 
