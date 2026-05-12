@@ -1,6 +1,6 @@
 # Recipe Manager
 
-A web application for extracting and saving structured recipe data from photos, URLs, and pasted text using the Claude API.
+An AI-powered web app for saving and managing all of your recipes in one place, with zero effort.
 
 ## Deploy on Railway
 
