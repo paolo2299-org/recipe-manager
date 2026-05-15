@@ -43,9 +43,6 @@ must not be written by more than one instance; `railway.toml` already pins
 Do **not** set `PORT` (Railway injects it) or `DATABASE_PATH` (defaults to the
 mounted volume path).
 
-Optional, only if you want them exposed: `HELICONE_ENABLED`
-+ `HELICONE_BASE_URL` + `HELICONE_API_KEY`. Leave them out for the simplest flow.
-
 ## 4. Publish the template
 
 Project settings → **Create Template**. Fill in:
