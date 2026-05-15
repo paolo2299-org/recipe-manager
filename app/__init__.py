@@ -55,9 +55,6 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
     from app.storage.db import init_db
     init_db(app)
 
-    from app.telemetry import configure_telemetry
-    configure_telemetry(app)
-
     from app.routes.auth import bp as auth_bp
     from app.routes.recipes import bp
     app.register_blueprint(auth_bp)
