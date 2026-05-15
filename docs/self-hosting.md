@@ -61,13 +61,6 @@ HELICONE_API_KEY=optional_helicone_api_key
 HELICONE_APP_NAME=recipe-manager
 ```
 
-Optional Honeycomb tracing:
-
-```dotenv
-HONEYCOMB_API_KEY=your_honeycomb_ingest_key
-# OTEL_SERVICE_NAME=recipe-manager
-```
-
 `DATABASE_PATH` and `PORT` don't need to be set — they default to
 `/app/data/recipes.db` and `8080` (in the Dockerfile), and `compose.prod.yml` maps
 `/app/data` onto `/srv/recipe-manager/data`.

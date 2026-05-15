@@ -5,7 +5,6 @@ import logging
 from typing import Any
 
 import anthropic
-from opentelemetry import trace
 from pydantic import ValidationError
 
 from app.schemas.calorie import CalorieEntry, MissingCalorie, PrefilledCalories
@@ -16,7 +15,6 @@ from .jina import fetch_via_jina
 from .schema import EDIT_RECIPE_TOOL, EXTRACT_RECIPE_TOOL, FILL_CALORIES_TOOL
 
 logger = logging.getLogger(__name__)
-tracer = trace.get_tracer(__name__)
 
 
 class ExtractionError(Exception):
@@ -33,36 +31,29 @@ def _call_claude_tool(
 ) -> dict[str, Any]:
     """Send messages to Claude with forced tool use and return the tool payload."""
     tool_name = tool["name"]
-    with tracer.start_as_current_span("claude.tool_call") as span:
-        span.set_attribute("llm.model", "claude-sonnet-4-6")
-        span.set_attribute("llm.tool", tool_name)
+    client = _build_anthropic_client()
+    response = client.messages.create(  # type: ignore[call-overload]
+        model="claude-sonnet-4-6",
+        max_tokens=4096,
+        tools=[tool],
+        tool_choice={"type": "tool", "name": tool_name},
+        messages=messages,
+    )
 
-        client = _build_anthropic_client()
-        response = client.messages.create(  # type: ignore[call-overload]
-            model="claude-sonnet-4-6",
-            max_tokens=4096,
-            tools=[tool],
-            tool_choice={"type": "tool", "name": tool_name},
-            messages=messages,
-        )
-
-        span.set_attribute("llm.usage.input_tokens", response.usage.input_tokens)
-        span.set_attribute("llm.usage.output_tokens", response.usage.output_tokens)
-
-        for block in response.content:
-            if block.type == "tool_use" and block.name == tool_name:
-                logger.info(
-                    "Claude tool %s complete. Input tokens: %d, output tokens: %d",
-                    tool_name,
-                    response.usage.input_tokens,
-                    response.usage.output_tokens,
+    for block in response.content:
+        if block.type == "tool_use" and block.name == tool_name:
+            logger.info(
+                "Claude tool %s complete. Input tokens: %d, output tokens: %d",
+                tool_name,
+                response.usage.input_tokens,
+                response.usage.output_tokens,
+            )
+            payload = block.input
+            if not isinstance(payload, dict):
+                raise ExtractionError(
+                    f"Tool {tool_name} returned a non-object payload"
                 )
-                payload = block.input
-                if not isinstance(payload, dict):
-                    raise ExtractionError(
-                        f"Tool {tool_name} returned a non-object payload"
-                    )
-                return payload
+            return payload
 
     raise ExtractionError(f"Model did not call the {tool_name} tool")
 

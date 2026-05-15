@@ -19,8 +19,6 @@ class Config:
     }
     AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "")
     AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "")
-    HONEYCOMB_API_KEY = os.environ.get("HONEYCOMB_API_KEY", "")
-    OTEL_SERVICE_NAME = os.environ.get("OTEL_SERVICE_NAME", "recipe-manager")
 
 
 class DevelopmentConfig(Config):
