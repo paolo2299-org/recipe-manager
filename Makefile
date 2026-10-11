@@ -14,7 +14,7 @@ run:
 	$(COMPOSE) up --build recipe-manager
 
 test:
-	$(COMPOSE) run --rm test
+	$(COMPOSE) run --build --rm test
 
 typecheck:
 	mypy app tests
