@@ -39,7 +39,7 @@ Underlying Compose usage:
 
 Notes:
 
-- The app runs on `http://localhost:8080`
+- The app runs on `http://localhost:18081`
 - The SQLite database lives at `data/recipes.db` (bind-mounted into the container)
 - Do not assume a host Python environment is available or correct
 
@@ -61,7 +61,7 @@ Google auth behavior:
 
 - Auth is enabled by default with `GOOGLE_AUTH_ENABLED=true`
 - Allowed Google accounts come from `GOOGLE_ALLOWED_EMAILS`
-- Local OAuth redirect URI must include `http://localhost:8080/auth/google/callback`
+- Local OAuth redirect URI must include `http://localhost:18081/auth/google/callback`
 
 Important:
 

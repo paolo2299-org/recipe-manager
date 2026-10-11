@@ -7,7 +7,11 @@ cp .env.example .env       # then set ANTHROPIC_API_KEY and SECRET_KEY
 make dev
 ```
 
-The app is available at `http://localhost:8080` with Flask hot reload enabled.
+The app is available at `http://localhost:18081` with Flask hot reload enabled.
+The development Compose project is named `recipe-manager-dev`, publishes only
+on the host loopback interface, and stores its SQLite database under this
+checkout's `data/` directory. It does not share production containers, networks,
+secrets, or mutable data.
 
 Useful commands:
 
@@ -20,6 +24,15 @@ Useful commands:
 If `.env` is missing, the `make` targets fall back to `.env.example` so config validation
 and teardown still work in a fresh checkout. To run against real credentials, copy
 `.env.example` to `.env` and fill in the secrets.
+
+To work on a remote development host, forward the loopback-only port over SSH:
+
+```bash
+ssh -N -L 18081:127.0.0.1:18081 deploy@hetzner
+```
+
+Then open `http://localhost:18081` on the local machine. Set `DEV_PORT` in
+`.env` to override the default when necessary.
 
 ## Running tests
 

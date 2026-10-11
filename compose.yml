@@ -1,3 +1,5 @@
+name: recipe-manager-dev
+
 services:
   recipe-manager:
     image: ${IMAGE_NAME:-recipe-manager}:${IMAGE_TAG:-main}
