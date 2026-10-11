@@ -2,8 +2,9 @@
 
 This is the deployment path used by the maintainer: a single VM running Docker
 Compose, with [Caddy](https://caddyserver.com/) in front terminating TLS, and an
-optional GitHub Actions pipeline that builds an image and redeploys on every push
-to `main`.
+optional GitHub Actions pipeline that builds and publishes an image on every push
+to `main`. The VM pulls published images independently; GitHub Actions does not
+connect to it.
 
 If you just want the app running with the least possible effort, use the one-click
 [Railway deployment](../README.md) instead — you don't need any of this.
@@ -48,7 +49,7 @@ FLASK_ENV=production
 AUTH_ENABLED=true
 AUTH_USERNAME=admin
 AUTH_PASSWORD=a_strong_password
-# Only needed for the automatic-deploy pipeline below — the GHCR image to pull.
+# Only needed when pulling the published GHCR image.
 IMAGE_NAME=ghcr.io/your-github-user/recipe-manager
 ```
 
@@ -88,14 +89,16 @@ Or via the Make targets:
 - `make prod-stop` — stop the app container without removing it
 - `make prod-restart` — restart the app container
 
-## Automatic deploys from GitHub
+## Publishing images from GitHub
 
 `.github/workflows/deploy.yml` runs on every push to `main` and:
 
 - runs `make test`
 - builds a Docker image
 - pushes it to GitHub Container Registry (GHCR), tagged with the commit SHA and `main`
-- SSHes into the VM, pulls the image for that commit, and restarts the app with Compose
+
+The workflow stops after publishing the image. It has no SSH access to the VM and
+does not initiate a production deployment.
 
 ### 1. Set the image name
 
@@ -108,29 +111,12 @@ IMAGE_NAME=ghcr.io/your-github-user/recipe-manager
 ### 2. Let the VM pull from GHCR
 
 If the package is private, create a GitHub personal access token with at least
-`read:packages` and add these repository secrets:
-
-- `GHCR_USERNAME`
-- `GHCR_TOKEN`
+`read:packages`. Store the credentials on the VM for the pull-based deployment
+service; do not add them to this repository's Actions secrets.
 
 If the package is public, leave them unset — the VM pulls anonymously.
 
-### 3. Add deployment secrets
-
-Repository secrets for the SSH step:
-
-- `DEPLOY_HOST`
-- `DEPLOY_USER`
-- `DEPLOY_SSH_KEY` (private key for a deploy user that can run Docker Compose on the VM)
-
-Optional:
-
-- `DEPLOY_PORT` (if not `22`)
-
-Once those are in place, merges into `main` publish a new image and restart the app
-automatically.
-
-### 4. Rollback
+### 3. Rollback
 
 Because images are tagged with the commit SHA, roll back by pinning `IMAGE_TAG` on the VM:
 
