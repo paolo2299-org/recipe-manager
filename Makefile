@@ -14,6 +14,9 @@ setup:
 dev:
 	$(PYTHON) scripts/dev_session.py start
 
+dev-start:
+	$(PYTHON) scripts/dev_session.py start-detached
+
 dev-status:
 	$(PYTHON) scripts/dev_session.py status
 
@@ -60,4 +63,4 @@ prod-stop:
 prod-restart:
 	$(COMPOSE_PROD) restart recipe-manager
 
-.PHONY: setup dev dev-status dev-stop dev-prune dev-clean build run test docker-test docker-dev typecheck down shell prod-start prod-stop prod-restart
+.PHONY: setup dev dev-start dev-status dev-stop dev-prune dev-clean build run test docker-test docker-dev typecheck down shell prod-start prod-stop prod-restart

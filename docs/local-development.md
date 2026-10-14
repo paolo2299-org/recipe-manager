@@ -7,19 +7,22 @@ the Mac or VPS, then run this in each worktree:
 
 ```bash
 make setup
-make dev
+make dev-start
 ```
 
-`make setup` creates a worktree-local Python 3.12 `.venv`. `make dev` starts a
-foreground Flask server on a port reserved by the server itself. It binds to
+`make setup` creates a worktree-local Python 3.12 `.venv`. `make dev-start`
+launches a detached Flask server and waits for its session to report ready.
+It writes output to `.dev/server.log` and runs independently of the launching
+shell. Use `make dev` instead when you want a foreground server in an
+interactive terminal. The server reserves its own port and binds to
 the host's Tailscale IPv4 address when available, otherwise to `127.0.0.1`.
 It prints the URL and records it in `.dev/session.json`. `DEV_HOST=127.0.0.1
-make dev` forces local-only access. Binding to public interfaces is refused.
+make dev-start` forces local-only access. Binding to public interfaces is refused.
 
 Each worktree has its own `.dev/recipes.db`, process control socket, and
 Playwright session name. Its SQLite database is never taken from `.env` or the
 production `/srv/recipe-manager/data` path. The launcher forces development
-mode. Flask's auto-reloader is disabled in this prototype; restart `make dev`
+mode. Flask's auto-reloader is disabled in this prototype; restart the server
 after Python code changes. Template and static changes appear on page refresh.
 
 On the VPS, use the `url` and `playwright_session` from `.dev/session.json`:
@@ -43,6 +46,7 @@ Useful commands:
 
 - `make dev-status` — show the exact URL, database and Playwright session
 - `make dev-stop` — stop only this worktree's development server
+- `make dev` — run the server in the foreground instead of detached
 - `make dev-prune` — remove stale run metadata after a crash or reboot, keeping SQLite data
 - `make dev-clean` — after stopping, remove only this worktree's development SQLite data
 - `make test` — run pytest in this worktree's virtualenv
@@ -50,8 +54,10 @@ Useful commands:
 - `make docker-test` — run the existing container test suite used by CI
 - `make docker-dev` — run the legacy Compose development stack when specifically needed
 
-The foreground command may continue running after a phone disconnect or a
-Codex chat ends. Use `make dev-stop` explicitly at the end of a work session.
+The detached server keeps running after a phone disconnect or Codex chat ends.
+Use `make dev-stop` explicitly at the end of a work session. It waits for the
+server to finish shutting down before returning, so `make dev-clean` can follow.
+Check `.dev/server.log` if startup fails or the server exits unexpectedly.
 `make dev-prune` handles stale metadata but does not terminate another process.
 Use `make dev-clean` when the worktree's scratch database is no longer needed.
 If Codex starts the server outside its command sandbox, stopping it may also

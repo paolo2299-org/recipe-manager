@@ -21,7 +21,8 @@ production images and optional container checks.
 Primary commands:
 
 - `make setup` to create a Python 3.12 `.venv` with uv
-- `make dev` to start the app
+- `make dev-start` to start the app persistently for Codex or remote sessions
+- `make dev` to run it in the foreground from an interactive terminal
 - `make dev-status` to find its allocated URL and Playwright session name
 - `make dev-stop` to stop only this worktree's app
 - `make dev-clean` when its scratch SQLite data is no longer needed
@@ -29,7 +30,7 @@ Primary commands:
 - `make docker-test` for the CI container check
 
 **For LLM agents (Claude, Codex, etc.):** work in a separate Git worktree.
-Run `make setup` there once, then `make dev` and `make test`. Use the URL and
+Run `make setup` there once, then `make dev-start` and `make test`. Use the URL and
 Playwright session reported by `.dev/session.json`. Stop the server with
 `make dev-stop` when the work is complete. Do not run ordinary development
 commands against production Compose files, containers, or `/srv` data.
