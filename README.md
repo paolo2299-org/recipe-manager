@@ -16,6 +16,8 @@ Cost: **free** on Railway's free tier, plus a few cents per recipe extraction bi
 
 ## More documentation
 
+- Development and tests use Python 3.12 with uv; CI runs the same commands.
+  Docker is used for production images and deployment.
 - For parallel tasks, use `make worktree-create NAME=<task-name>` from a clean
   retained checkout. When finished testing, run `make worktree-finish NAME=<task-name>`
   from the retained checkout: it checks for unfinished/unpublished work, stops the

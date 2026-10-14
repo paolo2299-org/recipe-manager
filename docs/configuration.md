@@ -17,6 +17,5 @@ There is no multi-user support or external identity provider.
 ## Database
 
 The schema is created automatically on startup. Native development stores
-recipes in each worktree's ignored `.dev/recipes.db`. The optional Docker
-development stack uses `data/recipes.db` bind-mounted at `/app/data/recipes.db`.
-Railway backs the container path with a persistent volume.
+recipes in each worktree's ignored `.dev/recipes.db`. Production containers use
+`/app/data/recipes.db`, backed by a persistent host directory or Railway volume.

@@ -86,6 +86,7 @@ docker compose -f compose.yml -f compose.prod.yml up -d
 Or via the Make targets:
 
 - `make prod-start` — start with the production overlay
+- `make prod-build` — build the production image locally when needed
 - `make prod-stop` — stop the app container without removing it
 - `make prod-restart` — restart the app container
 
@@ -93,7 +94,7 @@ Or via the Make targets:
 
 `.github/workflows/deploy.yml` runs on every push to `main` and:
 
-- runs `make test`
+- sets up Python 3.12 and runs `make setup`, `make test` and `make typecheck`
 - builds a Docker image
 - pushes it to GitHub Container Registry (GHCR), tagged with the commit SHA and `main`
 

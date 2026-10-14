@@ -121,8 +121,6 @@ Useful commands:
 - `make dev-clean` — after stopping, remove only this worktree's development SQLite data
 - `make test` — run pytest in this worktree's virtualenv
 - `make typecheck` — run mypy in this worktree's virtualenv
-- `make docker-test` — run the existing container test suite used by CI
-- `make docker-dev` — run the legacy Compose development stack when specifically needed
 
 The detached server keeps running after a phone disconnect or Codex chat ends.
 Use `make dev-stop` explicitly when you no longer need the server. It waits for the
@@ -133,8 +131,8 @@ Use `make dev-clean` when the worktree's scratch database is no longer needed.
 If Codex starts the server outside its command sandbox, stopping it may also
 need an outside-sandbox command approval. `make dev-status` still reads the
 recorded URL and checks the worktree lock when the control socket is inaccessible.
-The older Compose targets remain available for container parity checks; their
-fixed `DEV_PORT` is not suitable for simultaneous worktrees.
+Docker is used for production images and deployment. Development and tests use
+the Python environment described here.
 
 ## Running tests
 
@@ -143,8 +141,8 @@ make test
 ```
 
 The suite runs in the worktree's `.venv`. External services are mocked, and
-each test gets an isolated SQLite database under a temp directory. CI still
-runs `make docker-test` while this native workflow is being validated.
+each test gets an isolated SQLite database under a temp directory. CI runs the
+same `make setup`, `make test` and `make typecheck` commands with Python 3.12.
 
 ## Project structure
 
@@ -169,10 +167,8 @@ app/
   templates/               # Jinja2 templates (Pico CSS + HTMX)
   static/css/app.css       # Minimal custom styles
 .dev/                      # ignored native dev database and run metadata
-data/                      # legacy Docker dev database
 tests/                     # Pytest suite
-compose.yml                # Shared Compose settings
-compose.dev.yml            # Local development + test overrides
+compose.yml                # Base production Compose settings
 compose.prod.yml           # Self-hosted VM overrides
 railway.toml               # Railway build/deploy config
 docs/                      # Additional guides

@@ -15,8 +15,8 @@ Main stack:
 
 ## Local Development
 
-Use a worktree-local Python environment for development. Docker remains for
-production images and optional container checks.
+Use a worktree-local Python environment for development and tests. CI uses the
+same setup and commands. Docker is used for production images and deployment.
 
 Primary commands:
 
@@ -27,7 +27,6 @@ Primary commands:
 - `make dev-stop` to stop only this worktree's app
 - `make dev-clean` when its scratch SQLite data is no longer needed
 - `make test` to run pytest in the virtualenv
-- `make docker-test` for the CI container check
 
 **For LLM agents (Claude, Codex, etc.):** use a separate Git worktree. Reuse the
 current task's suitable worktree rather than creating one each turn. For a new
@@ -58,16 +57,12 @@ See `docs/local-development.md` for recovery and disposable-file details.
 Do not run ordinary development commands against production Compose files,
 containers, or `/srv` data.
 
-Underlying Compose usage:
-
-- optional container development uses `docker compose -f compose.yml -f compose.dev.yml up`
-- production uses `docker compose -f compose.yml -f compose.prod.yml up -d`
+Production Compose usage: `docker compose -f compose.yml -f compose.prod.yml up -d`.
 
 Notes:
 
 - Native dev binds to a dynamically allocated loopback or Tailscale port
 - Its SQLite database lives at `.dev/recipes.db` in this worktree
-- The legacy Docker dev database lives at `data/recipes.db`
 
 ## Environment And Auth
 
@@ -105,10 +100,9 @@ When changing auth, routing, storage, or config:
 
 ## Key Files
 
-- `compose.yml`: shared Compose settings
-- `compose.dev.yml`: optional container development and CI test overrides
+- `compose.yml`: base production Compose settings
 - `compose.prod.yml`: production VM overrides
-- `Dockerfile`: shared image for app and tests
+- `Dockerfile`: production app image
 - `Makefile`: standard developer entrypoints
 - `app/config.py`: app configuration and credentials
 - `app/__init__.py`: app factory and startup validation (calls `init_db`)
