@@ -29,11 +29,34 @@ Primary commands:
 - `make test` to run pytest in the virtualenv
 - `make docker-test` for the CI container check
 
-**For LLM agents (Claude, Codex, etc.):** work in a separate Git worktree.
-Run `make setup` there once, then `make dev-start` and `make test`. Use the URL and
-Playwright session reported by `.dev/session.json`. Stop the server with
-`make dev-stop` when the work is complete. Do not run ordinary development
-commands against production Compose files, containers, or `/srv` data.
+**For LLM agents (Claude, Codex, etc.):** use a separate Git worktree. Reuse the
+current task's suitable worktree rather than creating one each turn. For a new
+environment, run `make worktree-create NAME=<unique-task-name>` from a clean,
+retained checkout. It creates `codex/<unique-task-name>` and prints the path.
+Run `make setup` there once, then `make dev-start` and `make test`. Report the
+environment name, branch, path, URL and Playwright session from `.dev/session.json`.
+
+Leave the environment and server available while the user tests or intends to
+resume. A turn ending or phone disconnecting is NOT authorization to clean up.
+When the user says they are finished with this environment:
+
+1. Close only its named Playwright session if you opened one (never `close-all`).
+2. From a retained checkout, run `make worktree-check NAME=<name>`.
+3. If it passes, run `make worktree-finish NAME=<name>`. This stops only that
+   server, removes its scratch data/logs/venv and worktree, and retains the branch.
+4. Report removal and the retained branch. If a guard fails, explain what needs
+   preserving and leave it in place. Do not force removal, discard changes,
+   delete branches, or commit/push merely to bypass a guard without authorization.
+
+Cleanup requires access to `origin` to verify published commits. Unexpected
+ignored files (including `.env`) block removal; preserve or explicitly resolve
+them with the user. Do not run competing lifecycle commands in the same
+environment. Only environments created by this helper are eligible: do not
+adopt or remove app-managed, manually created, or another task's worktrees.
+See `docs/local-development.md` for recovery and disposable-file details.
+
+Do not run ordinary development commands against production Compose files,
+containers, or `/srv` data.
 
 Underlying Compose usage:
 

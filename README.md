@@ -16,6 +16,11 @@ Cost: **free** on Railway's free tier, plus a few cents per recipe extraction bi
 
 ## More documentation
 
+- For parallel tasks, use `make worktree-create NAME=<task-name>` from a clean
+  retained checkout. When finished testing, run `make worktree-finish NAME=<task-name>`
+  from the retained checkout: it checks for unfinished/unpublished work, stops the
+  server and removes disposable files/worktree while retaining the branch.
+  Unexpected ignored files such as `.env` block cleanup. See the lifecycle guide below.
 - For a worktree-local native development server, run `make setup` and then
   `make dev-start`. The server prints its allocated local or Tailscale URL;
   `make dev-stop` stops it. Use `make dev` for a foreground terminal session.

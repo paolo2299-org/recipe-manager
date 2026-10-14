@@ -1,5 +1,75 @@
 # Local development
 
+## Managed worktrees for parallel tasks
+
+From a **clean, retained checkout** on the desired starting commit:
+
+```bash
+make worktree-create NAME=recipe-search
+```
+
+This creates branch `codex/recipe-search` in a sibling directory of the main
+checkout: `<main-checkout-name>-worktrees/recipe-search`. Use the printed path,
+then run `make setup` and `make dev-start` there. Repeat with another unique name
+for another task. Python 3.10+ and Git are sufficient for lifecycle commands;
+the app itself uses Python 3.12. No Docker or virtualenv is needed to create an
+environment. The source checkout must be clean so uncommitted work is not
+silently omitted. No `.env`, production data, or existing virtualenv is copied.
+
+Names contain up to 48 lowercase letters, digits and hyphens, starting with a
+letter or digit. Each gets a named branch (not detached HEAD). Existing paths,
+names and branches are never overwritten. To select a different base commit:
+
+```bash
+python3 scripts/dev_worktree.py create recipe-search --base origin/main
+```
+
+`make worktree-list` lists this repository's managed names, branches and paths.
+Ownership records live under `dev-worktrees/` in the shared Git directory,
+outside the disposable worktrees. Lifecycle commands are serialized with a
+registry lock. The registry does not adopt existing manual or app-managed trees.
+
+### Finishing an environment
+
+Keep servers and worktrees until you have finished testing; ending an agent
+turn is not a cleanup signal. Ask the agent to "finish environment recipe-search"
+when ready. Close its named Playwright session first if one was opened. From
+the retained checkout (not the worktree you are removing), run:
+
+```bash
+make worktree-check NAME=recipe-search
+make worktree-finish NAME=recipe-search
+```
+
+The check does not stop the server or delete files, but fetches `origin` to
+refresh publication evidence. Finish repeats the checks, stops only that server,
+waits for its lock, checks again, then uses `git worktree remove` **without force**.
+It retains `codex/recipe-search`, so the name cannot be reused until the retained
+branch is separately dealt with. Prefer a new name for a new task.
+
+Removal is refused for uncommitted/staged/untracked work, locked/detached/switched
+worktrees, unexpected identity changes, or any HEAD not contained in a freshly
+fetched `origin` branch. Fetch failure also refuses removal. Commits preserved
+only in a local branch or tag do not suffice. Squash-merged branches may need
+manual review because their original commits are not ancestors of the squash.
+The helper never commits, pushes, deletes branches, or changes production.
+
+**Finishing discards the environment's scratch SQLite database, logs, virtualenv
+and caches.** Preserve any wanted test data first. Specifically, allowed ignored
+outputs are `.venv/`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, Python
+`__pycache__/` directories, and the known `.dev/` database/sidecars, log, lock,
+session JSON and control socket. Other ignored files—including `.env`, legacy
+`data/` databases, and unknown `.dev/` files—block cleanup. Do not store valuable
+files inside disposable cache/venv directories. Symlinked dev state is rejected.
+
+If a guard fails, the worktree stays. Resolve/preserve the reported files or
+publish commits with the user's authorization, then retry. A late failure after
+shutdown can leave the server stopped, but the worktree retained; restart with
+`make dev-start` if needed. If socket access is denied, rerun with the appropriate
+command permission; do not disable sandbox protections globally. Do not edit or
+restart the same environment concurrently with finish. Other environments can
+continue normally. There is no age-based cleanup or background deletion service.
+
 ## Running the app
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) once on
@@ -55,7 +125,7 @@ Useful commands:
 - `make docker-dev` — run the legacy Compose development stack when specifically needed
 
 The detached server keeps running after a phone disconnect or Codex chat ends.
-Use `make dev-stop` explicitly at the end of a work session. It waits for the
+Use `make dev-stop` explicitly when you no longer need the server. It waits for the
 server to finish shutting down before returning, so `make dev-clean` can follow.
 Check `.dev/server.log` if startup fails or the server exits unexpectedly.
 `make dev-prune` handles stale metadata but does not terminate another process.

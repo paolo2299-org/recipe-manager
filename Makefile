@@ -6,6 +6,18 @@ COMPOSE = ENV_FILE=$(ENV_FILE) docker compose -f compose.yml -f compose.dev.yml
 COMPOSE_PROD = ENV_FILE=$(ENV_FILE) docker compose -f compose.yml -f compose.prod.yml
 
 # Worktree-local development
+worktree-create:
+	python3 scripts/dev_worktree.py create "$(NAME)"
+
+worktree-list:
+	python3 scripts/dev_worktree.py list
+
+worktree-check:
+	python3 scripts/dev_worktree.py check "$(NAME)"
+
+worktree-finish:
+	python3 scripts/dev_worktree.py finish "$(NAME)"
+
 setup:
 	@if [ ! -x $(PYTHON) ]; then $(UV) venv --python 3.12 .venv; fi
 	@$(PYTHON) -c 'import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else "Existing .venv is not Python 3.12; recreate it before running make setup")'
@@ -63,4 +75,4 @@ prod-stop:
 prod-restart:
 	$(COMPOSE_PROD) restart recipe-manager
 
-.PHONY: setup dev dev-start dev-status dev-stop dev-prune dev-clean build run test docker-test docker-dev typecheck down shell prod-start prod-stop prod-restart
+.PHONY: worktree-create worktree-list worktree-check worktree-finish setup dev dev-start dev-status dev-stop dev-prune dev-clean build run test docker-test docker-dev typecheck down shell prod-start prod-stop prod-restart
