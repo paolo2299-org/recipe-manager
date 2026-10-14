@@ -16,6 +16,8 @@ Cost: **free** on Railway's free tier, plus a few cents per recipe extraction bi
 
 ## More documentation
 
+- For a worktree-local native development server, run `make setup` and then
+  `make dev`. The server prints its allocated local or Tailscale URL.
 - [Local development](docs/local-development.md) — running the app locally, make commands, and tests
 - [Configuration reference](docs/configuration.md) — all environment variables and database settings
 - [Self-hosting on your own server](docs/self-hosting.md) — Docker Compose + Caddy setup on a VM

@@ -9,14 +9,14 @@
 | `AUTH_ENABLED` | no (default `true`) | when true, the app requires login |
 | `AUTH_USERNAME` / `AUTH_PASSWORD` | yes if auth is enabled | the single login account |
 | `FLASK_ENV` | no | `development` (default) or `production` |
-| `DATABASE_PATH` | no | SQLite file path; defaults to `/app/data/recipes.db` in the container |
+| `DATABASE_PATH` | no | SQLite file path; native `make dev` forces `.dev/recipes.db`, while the container defaults to `/app/data/recipes.db` |
 
 Authentication is a single username/password (set via `AUTH_USERNAME` / `AUTH_PASSWORD`).
 There is no multi-user support or external identity provider.
 
 ## Database
 
-Recipes are stored in a SQLite file at `/app/data/recipes.db` inside the container (override
-with `DATABASE_PATH`). The schema is created automatically on startup. In local dev the
-`data/` directory is bind-mounted into the container, so data survives `make down` / `make dev`
-cycles; on Railway the same path is backed by a persistent volume.
+The schema is created automatically on startup. Native development stores
+recipes in each worktree's ignored `.dev/recipes.db`. The optional Docker
+development stack uses `data/recipes.db` bind-mounted at `/app/data/recipes.db`.
+Railway backs the container path with a persistent volume.

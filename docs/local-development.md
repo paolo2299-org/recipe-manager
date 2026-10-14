@@ -2,37 +2,60 @@
 
 ## Running the app
 
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) once on
+the Mac or VPS, then run this in each worktree:
+
 ```bash
-cp .env.example .env       # then set ANTHROPIC_API_KEY and SECRET_KEY
+make setup
 make dev
 ```
 
-The app is available at `http://localhost:18081` with Flask hot reload enabled.
-The development Compose project is named `recipe-manager-dev`, publishes only
-on the host loopback interface, and stores its SQLite database under this
-checkout's `data/` directory. It does not share production containers, networks,
-secrets, or mutable data.
+`make setup` creates a worktree-local Python 3.12 `.venv`. `make dev` starts a
+foreground Flask server on a port reserved by the server itself. It binds to
+the host's Tailscale IPv4 address when available, otherwise to `127.0.0.1`.
+It prints the URL and records it in `.dev/session.json`. `DEV_HOST=127.0.0.1
+make dev` forces local-only access. Binding to public interfaces is refused.
+
+Each worktree has its own `.dev/recipes.db`, process control socket, and
+Playwright session name. Its SQLite database is never taken from `.env` or the
+production `/srv/recipe-manager/data` path. The launcher forces development
+mode. Flask's auto-reloader is disabled in this prototype; restart `make dev`
+after Python code changes. Template and static changes appear on page refresh.
+
+On the VPS, use the `url` and `playwright_session` from `.dev/session.json`:
+
+```bash
+playwright-cli -s=<playwright_session> open <url>
+playwright-cli -s=<playwright_session> snapshot
+playwright-cli -s=<playwright_session> console
+playwright-cli -s=<playwright_session> close
+```
+
+Always close that named browser session when finished. Do not use
+`playwright-cli close-all`, which would affect other worktrees.
+
+Without `.env`, authentication is disabled for development and extraction
+features requiring Anthropic credentials will not work. To test those features,
+create a worktree-local `.env` with development credentials. Never copy the
+production environment file into a worktree.
 
 Useful commands:
 
-- `make dev` — start the app
-- `make test` — run the pytest suite inside Docker
-- `make typecheck` — run mypy
-- `make shell` — open a shell inside the running app container
-- `make down` — stop and remove the local containers
+- `make dev-status` — show the exact URL, database and Playwright session
+- `make dev-stop` — stop only this worktree's development server
+- `make dev-prune` — remove stale run metadata after a crash or reboot, keeping SQLite data
+- `make dev-clean` — after stopping, remove only this worktree's development SQLite data
+- `make test` — run pytest in this worktree's virtualenv
+- `make typecheck` — run mypy in this worktree's virtualenv
+- `make docker-test` — run the existing container test suite used by CI
+- `make docker-dev` — run the legacy Compose development stack when specifically needed
 
-If `.env` is missing, the `make` targets fall back to `.env.example` so config validation
-and teardown still work in a fresh checkout. To run against real credentials, copy
-`.env.example` to `.env` and fill in the secrets.
-
-To work on a remote development host, forward the loopback-only port over SSH:
-
-```bash
-ssh -N -L 18081:127.0.0.1:18081 deploy@hetzner
-```
-
-Then open `http://localhost:18081` on the local machine. Set `DEV_PORT` in
-`.env` to override the default when necessary.
+The foreground command may continue running after a phone disconnect or a
+Codex chat ends. Use `make dev-stop` explicitly at the end of a work session.
+`make dev-prune` handles stale metadata but does not terminate another process.
+Use `make dev-clean` when the worktree's scratch database is no longer needed.
+The older Compose targets remain available for container parity checks; their
+fixed `DEV_PORT` is not suitable for simultaneous worktrees.
 
 ## Running tests
 
@@ -40,8 +63,9 @@ Then open `http://localhost:18081` on the local machine. Set `DEV_PORT` in
 make test
 ```
 
-The suite runs inside Docker. External services are mocked, and each test gets an isolated
-SQLite database under a temp directory.
+The suite runs in the worktree's `.venv`. External services are mocked, and
+each test gets an isolated SQLite database under a temp directory. CI still
+runs `make docker-test` while this native workflow is being validated.
 
 ## Project structure
 
@@ -65,7 +89,8 @@ app/
     recipes.py             # Flask blueprint with all routes (+ /health)
   templates/               # Jinja2 templates (Pico CSS + HTMX)
   static/css/app.css       # Minimal custom styles
-data/                      # SQLite database lives here (bind-mounted / volume)
+.dev/                      # ignored native dev database and run metadata
+data/                      # legacy Docker dev database
 tests/                     # Pytest suite
 compose.yml                # Shared Compose settings
 compose.dev.yml            # Local development + test overrides

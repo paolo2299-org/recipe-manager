@@ -10,64 +10,62 @@ Main stack:
 - Server-rendered Jinja templates in `app/templates/`
 - SQLite access in `app/storage/`
 - Extraction logic in `app/extraction/`
-- Google OAuth gate in `app/routes/auth.py`
+- Username/password authentication gate in `app/routes/auth.py`
 - Main product routes in `app/routes/recipes.py`
 
 ## Local Development
 
-This project is set up to use Docker for local development.
+Use a worktree-local Python environment for development. Docker remains for
+production images and optional container checks.
 
 Primary commands:
 
-- `cp .env.example .env`
+- `make setup` to create a Python 3.12 `.venv` with uv
 - `make dev` to start the app
-- `make test` to run the pytest suite in Docker
-- `make shell` to open a shell in the app container
-- `make down` to stop local containers
+- `make dev-status` to find its allocated URL and Playwright session name
+- `make dev-stop` to stop only this worktree's app
+- `make dev-clean` when its scratch SQLite data is no longer needed
+- `make test` to run pytest in the virtualenv
+- `make docker-test` for the CI container check
 
-**For LLM agents (Claude, Codex, etc.):** default to running tests and any
-other repo code through Docker (`make test`, `make shell`, or the underlying
-`docker compose` commands). Do not fall back to `python`, `pytest`, `pip`, or
-`uv` on the host — the host Python environment is not guaranteed to exist or
-to match the Docker image's dependencies. If a Docker command fails, debug
-the container setup; do not work around it by running on the host.
+**For LLM agents (Claude, Codex, etc.):** work in a separate Git worktree.
+Run `make setup` there once, then `make dev` and `make test`. Use the URL and
+Playwright session reported by `.dev/session.json`. Stop the server with
+`make dev-stop` when the work is complete. Do not run ordinary development
+commands against production Compose files, containers, or `/srv` data.
 
 Underlying Compose usage:
 
-- local development uses `docker compose -f compose.yml -f compose.dev.yml up`
+- optional container development uses `docker compose -f compose.yml -f compose.dev.yml up`
 - production uses `docker compose -f compose.yml -f compose.prod.yml up -d`
 
 Notes:
 
-- The app runs on `http://localhost:18081`
-- The SQLite database lives at `data/recipes.db` (bind-mounted into the container)
-- Do not assume a host Python environment is available or correct
+- Native dev binds to a dynamically allocated loopback or Tailscale port
+- Its SQLite database lives at `.dev/recipes.db` in this worktree
+- The legacy Docker dev database lives at `data/recipes.db`
 
 ## Environment And Auth
 
 Required environment variables in `.env`:
 
 - `ANTHROPIC_API_KEY`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
 - `SECRET_KEY`
-- `GOOGLE_ALLOWED_EMAILS` when `GOOGLE_AUTH_ENABLED=true`
+- `AUTH_USERNAME` and `AUTH_PASSWORD` when `AUTH_ENABLED=true`
 
 Optional:
 
-- `DATABASE_PATH` (defaults to `data/recipes.db`)
+- `DATABASE_PATH` (native dev always overrides this to `.dev/recipes.db`)
 
-Google auth behavior:
+Auth behavior:
 
-- Auth is enabled by default with `GOOGLE_AUTH_ENABLED=true`
-- Allowed Google accounts come from `GOOGLE_ALLOWED_EMAILS`
-- Local OAuth redirect URI must include `http://localhost:18081/auth/google/callback`
+- Native dev disables auth by default when no `.env` sets `AUTH_ENABLED`
+- If auth is enabled, set `AUTH_USERNAME` and `AUTH_PASSWORD`
 
 Important:
 
-- `app/__init__.py` validates Google auth config at startup
+- `app/__init__.py` validates username/password auth config at startup
 - `app/__init__.py` rejects the default `SECRET_KEY` in production
-- Keep `GOOGLE_ALLOWED_EMAILS` non-empty when auth is enabled
 
 ## Testing
 
@@ -84,11 +82,11 @@ When changing auth, routing, storage, or config:
 ## Key Files
 
 - `compose.yml`: shared Compose settings
-- `compose.dev.yml`: local app and test runner overrides
+- `compose.dev.yml`: optional container development and CI test overrides
 - `compose.prod.yml`: production VM overrides
 - `Dockerfile`: shared image for app and tests
 - `Makefile`: standard developer entrypoints
-- `app/config.py`: app config and allowed Google accounts
+- `app/config.py`: app configuration and credentials
 - `app/__init__.py`: app factory and startup validation (calls `init_db`)
 - `app/storage/db.py`: SQLite connection management and schema init
 - `app/storage/recipes.py`: Recipe CRUD
@@ -97,7 +95,7 @@ When changing auth, routing, storage, or config:
 
 ## Implementation Notes
 
-- The app uses session-based auth after Google sign-in
+- The app uses session-based auth after username/password login
 - HTMX requests are handled specially in the auth guard via `HX-Redirect`
 - `ProxyFix` is enabled so callback URLs and scheme handling work correctly behind proxies
 - The SQLite schema is created on startup via `CREATE TABLE IF NOT EXISTS`; `ingredients`, `steps`, and `tags` are stored as JSON TEXT columns
@@ -105,7 +103,7 @@ When changing auth, routing, storage, or config:
 ## Working Style For Future Sessions
 
 - Prefer small, surgical changes
-- Preserve the Docker-only local workflow
+- Preserve the worktree-local native workflow
 - Update `README.md` when changing setup, commands, or auth requirements
 - Verify meaningful changes with `make test`
-- If changing Google auth or startup validation, make sure the app still boots in Docker
+- If changing auth or startup validation, make sure the app still boots in Docker

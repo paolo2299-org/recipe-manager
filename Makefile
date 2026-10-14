@@ -1,11 +1,30 @@
 IMAGE_NAME = recipe-manager
+UV ?= uv
+PYTHON = .venv/bin/python
 ENV_FILE ?= $(shell if [ -f .env ]; then echo .env; else echo .env.example; fi)
 COMPOSE = ENV_FILE=$(ENV_FILE) docker compose -f compose.yml -f compose.dev.yml
 COMPOSE_PROD = ENV_FILE=$(ENV_FILE) docker compose -f compose.yml -f compose.prod.yml
 
-# Local development
+# Worktree-local development
+setup:
+	@if [ ! -x $(PYTHON) ]; then $(UV) venv --python 3.12 .venv; fi
+	@$(PYTHON) -c 'import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else "Existing .venv is not Python 3.12; recreate it before running make setup")'
+	$(UV) pip install --python $(PYTHON) -r requirements-dev.txt
+
 dev:
-	$(COMPOSE) up --build recipe-manager
+	$(PYTHON) scripts/dev_session.py start
+
+dev-status:
+	$(PYTHON) scripts/dev_session.py status
+
+dev-stop:
+	$(PYTHON) scripts/dev_session.py stop
+
+dev-prune:
+	$(PYTHON) scripts/dev_session.py prune
+
+dev-clean:
+	$(PYTHON) scripts/dev_session.py clean
 
 build:
 	docker build -t $(IMAGE_NAME) .
@@ -14,10 +33,16 @@ run:
 	$(COMPOSE) up --build recipe-manager
 
 test:
+	$(PYTHON) -m pytest tests/ -v
+
+docker-test:
 	$(COMPOSE) run --build --rm test
 
+docker-dev:
+	$(COMPOSE) up --build recipe-manager
+
 typecheck:
-	mypy app tests
+	$(PYTHON) -m mypy app tests
 
 down:
 	$(COMPOSE) down --remove-orphans
@@ -35,4 +60,4 @@ prod-stop:
 prod-restart:
 	$(COMPOSE_PROD) restart recipe-manager
 
-.PHONY: dev build run test typecheck down shell prod-start prod-stop prod-restart
+.PHONY: setup dev dev-status dev-stop dev-prune dev-clean build run test docker-test docker-dev typecheck down shell prod-start prod-stop prod-restart

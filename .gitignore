@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 .venv/
+.dev/
 venv/
 data/*.db
 data/*.db-journal
