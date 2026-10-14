@@ -25,7 +25,10 @@ STATE_DIR = ROOT / ".dev"
 STATE_FILE = STATE_DIR / "session.json"
 LOCK_FILE = STATE_DIR / "run.lock"
 SESSION_ID = hashlib.sha256(str(ROOT).encode()).hexdigest()[:12]
-SOCKET_FILE = Path(f"/tmp/recipe-dev-{os.getuid()}-{SESSION_ID}.sock")
+SOCKET_FILE = STATE_DIR / "control.sock"
+if len(os.fsencode(SOCKET_FILE)) >= 96:
+    # Unix socket paths have a short platform-specific limit.
+    SOCKET_FILE = Path(f"/tmp/recipe-dev-{os.getuid()}-{SESSION_ID}.sock")
 TAILSCALE_RANGE = ipaddress.ip_network("100.64.0.0/10")
 
 
@@ -83,6 +86,24 @@ def remove_stale_state() -> None:
             if path.stat().st_uid != os.getuid():
                 raise SystemExit(f"Refusing to remove a file owned by another user: {path}")
             path.unlink()
+
+
+def recorded_session() -> dict[str, object] | None:
+    try:
+        return json.loads(STATE_FILE.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
+def lock_is_held() -> bool:
+    if not LOCK_FILE.exists():
+        return False
+    with LOCK_FILE.open("a+") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+    return False
 
 
 def run_server() -> int:
@@ -196,6 +217,19 @@ def main() -> int:
         else:
             print(json.dumps(session, indent=2))
         return 0
+
+    recorded = recorded_session()
+    if recorded is not None and lock_is_held():
+        if command == "status":
+            recorded["control"] = "server lock held; control socket unavailable from this shell"
+            print(json.dumps(recorded, indent=2))
+            return 0
+        print("Server is running, but this shell cannot reach its control socket.")
+        print("Rerun make dev-stop outside the Codex command sandbox.")
+        return 2
+    if recorded is not None:
+        print("Stale run metadata found; use make dev-prune or start the server again")
+        return 1
 
     print("No running development server for this worktree")
     return 1

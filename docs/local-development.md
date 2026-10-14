@@ -54,6 +54,9 @@ The foreground command may continue running after a phone disconnect or a
 Codex chat ends. Use `make dev-stop` explicitly at the end of a work session.
 `make dev-prune` handles stale metadata but does not terminate another process.
 Use `make dev-clean` when the worktree's scratch database is no longer needed.
+If Codex starts the server outside its command sandbox, stopping it may also
+need an outside-sandbox command approval. `make dev-status` still reads the
+recorded URL and checks the worktree lock when the control socket is inaccessible.
 The older Compose targets remain available for container parity checks; their
 fixed `DEV_PORT` is not suitable for simultaneous worktrees.
 
