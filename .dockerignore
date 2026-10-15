@@ -10,3 +10,4 @@ data/
 exploration/
 __pycache__
 *.pyc
+.agents

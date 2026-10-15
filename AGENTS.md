@@ -15,6 +15,9 @@ Main stack:
 
 ## Local Development
 
+For plain-language preview/start/stop/cleanup requests, use this repository's
+`.agents/skills/dev-app/SKILL.md`. It is project-scoped on both the Mac and VPS.
+
 Use a worktree-local Python environment for development and tests. CI uses the
 same setup and commands. Docker is used for production images and deployment.
 

@@ -1,5 +1,15 @@
 # Local development
 
+## Plain-language previews
+
+This repository includes `.agents/skills/dev-app/`, a project-scoped Codex skill.
+Say **"please run the app"**, **"stop the app"**, or
+**"I'm finished testing, clean up this environment"**. The agent chooses a name,
+uses this task's worktree, reports the URL, and applies the existing cleanup
+checks. No user-level skill installation is needed on the Mac or VPS. New
+worktrees inherit it from Git; older worktrees need a commit containing the skill.
+The explicit fallback is `$dev-app`. This skill does not apply to other projects.
+
 ## Managed worktrees for parallel tasks
 
 From a **clean, retained checkout** on the desired starting commit:
