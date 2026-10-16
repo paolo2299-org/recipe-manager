@@ -154,7 +154,7 @@ def test_two_live_environments_cleanup_is_isolated(worktrees):
     git(worktrees.repo, "commit", "-m", "App for lifecycle test")
     git(worktrees.repo, "push", "origin", "main")
     targets = [worktrees.create(name) for name in ("alpha", "beta")]
-    env = {**os.environ, "DEV_HOST": "127.0.0.1", "AUTH_ENABLED": "false"}
+    env = {**os.environ, "DEV_CONFIG_DISABLED": "1", "DEV_HOST": "127.0.0.1", "AUTH_ENABLED": "false"}
 
     def server(target, command):
         return subprocess.run(
