@@ -30,3 +30,7 @@ Cost: **free** on Railway's free tier, plus a few cents per recipe extraction bi
 - [Configuration reference](docs/configuration.md) — all environment variables and database settings
 - [Self-hosting on your own server](docs/self-hosting.md) — Docker Compose + Caddy setup on a VM
 - [Publishing the Railway template](docs/railway-template.md) — maintainer notes for the one-click deploy button
+
+Private native-development settings can be shared across worktrees without
+committing secrets: see [private development configuration](docs/local-development.md#private-configuration-shared-by-worktrees).
+Use `make dev-config` to validate the project's host config without printing values.

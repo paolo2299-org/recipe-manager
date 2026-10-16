@@ -18,6 +18,50 @@ From a **clean, retained checkout** on the desired starting commit:
 make worktree-create NAME=recipe-search
 ```
 
+## Private configuration shared by worktrees
+
+Managed native servers automatically read `~/.config/project-dev/recipe-manager.json`
+(or `$XDG_CONFIG_HOME/project-dev/recipe-manager.json`). This is private host
+configuration, not a file to commit or copy into every worktree. No file is
+required for basic previews. `make dev-config` validates it and reports variable
+names only; it never prints values. Restart the server after changing config.
+
+Create the directory with mode `700` and the file with mode `600`, owned by the
+account running development. Symlinked files/directories, insecure permissions,
+invalid JSON and unsupported variables are refused. The format is a JSON object
+mapping these supported names to string values:
+
+- `ANTHROPIC_API_KEY`
+- `AUTH_ENABLED`
+- `AUTH_USERNAME`
+- `AUTH_PASSWORD`
+- `SECRET_KEY`
+- `HONEYCOMB_API_KEY`
+- `OTEL_SERVICE_NAME`
+- `DEV_HOST`
+
+Use `DEV_CONFIG_FILE=/absolute/path/to/private.json` for an explicit alternative;
+an explicit missing file is an error. Use `DEV_CONFIG_DISABLED=1` for an isolated
+run without host config. Precedence for managed servers is inherited environment,
+then a worktree-local .env, then private host config, then defaults.
+The launcher still enforces its development mode, private bind addresses and
+worktree-local scratch database.
+
+Only native development entrypoints load this file; production and ordinary
+tests do not. Nothing is exported to other projects or shell startup files.
+For an explicitly requested ancillary command (e.g. a scraper), use
+`python3 scripts/dev_config.py run -- <command> [arguments...]`. It passes only
+this project's allowed configuration to that child process. This wrapper does
+not load a worktree-local .env. Do not run scrapers or paid API calls just to
+start/verify a preview, print secret values, or copy production environment files.
+A user may authorise provisioning a particular existing API key separately.
+
+Cleanup never touches the host config. Existing worktree-local .env files still
+block guarded removal; preserve/resolve them explicitly instead of weakening the
+guard. Shared configs/credentials are readable by same-user project code; native
+worktrees are not a security sandbox for untrusted code.
+
+
 This creates branch `codex/recipe-search` in a sibling directory of the main
 checkout: `<main-checkout-name>-worktrees/recipe-search`. Use the printed path,
 then run `make setup` and `make dev-start` there. Repeat with another unique name
@@ -117,10 +161,10 @@ playwright-cli -s=<playwright_session> close
 Always close that named browser session when finished. Do not use
 `playwright-cli close-all`, which would affect other worktrees.
 
-Without `.env`, authentication is disabled for development and extraction
-features requiring Anthropic credentials will not work. To test those features,
-create a worktree-local `.env` with development credentials. Never copy the
-production environment file into a worktree.
+Authentication is disabled unless configured. AI extraction/editing/calorie
+features need ANTHROPIC_API_KEY from the inherited environment, local .env or
+private host config below. Prefer host config for credentials reused across
+worktrees. Never copy the production environment file into a worktree.
 
 Useful commands:
 

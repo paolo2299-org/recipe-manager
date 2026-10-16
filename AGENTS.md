@@ -128,3 +128,10 @@ When changing auth, routing, storage, or config:
 - Update `README.md` when changing setup, commands, or auth requirements
 - Verify meaningful changes with `make test`
 - If changing auth or startup validation, make sure the app still boots in Docker
+
+## Private native-development configuration
+
+Use the project-specific host config in `docs/local-development.md` for reusable
+credentials/settings. `make dev-config` reports names only. Never print secrets,
+copy an entire production env, or delete host config when finishing a worktree.
+Production-key provisioning requires the user's specific authorisation.

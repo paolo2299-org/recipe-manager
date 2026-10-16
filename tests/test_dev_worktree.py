@@ -149,6 +149,7 @@ def test_two_live_environments_cleanup_is_isolated(worktrees):
     shutil.copytree(source / "app", worktrees.repo / "app", ignore=shutil.ignore_patterns("__pycache__"))
     (worktrees.repo / "scripts").mkdir()
     shutil.copy2(source / "scripts/dev_session.py", worktrees.repo / "scripts/dev_session.py")
+    shutil.copy2(source / "scripts/dev_config.py", worktrees.repo / "scripts/dev_config.py")
     git(worktrees.repo, "add", ".")
     git(worktrees.repo, "commit", "-m", "App for lifecycle test")
     git(worktrees.repo, "push", "origin", "main")

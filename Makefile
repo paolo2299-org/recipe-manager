@@ -5,6 +5,9 @@ ENV_FILE ?= $(shell if [ -f .env ]; then echo .env; else echo .env.example; fi)
 COMPOSE_PROD = ENV_FILE=$(ENV_FILE) docker compose -f compose.yml -f compose.prod.yml
 
 # Worktree-local development
+dev-config:
+	python3 scripts/dev_config.py check
+
 worktree-create:
 	python3 scripts/dev_worktree.py create "$(NAME)"
 
@@ -59,4 +62,4 @@ prod-stop:
 prod-restart:
 	$(COMPOSE_PROD) restart recipe-manager
 
-.PHONY: worktree-create worktree-list worktree-check worktree-finish setup dev dev-start dev-status dev-stop dev-prune dev-clean test typecheck prod-build prod-start prod-stop prod-restart
+.PHONY: dev-config worktree-create worktree-list worktree-check worktree-finish setup dev dev-start dev-status dev-stop dev-prune dev-clean test typecheck prod-build prod-start prod-stop prod-restart

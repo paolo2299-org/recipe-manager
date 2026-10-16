@@ -164,6 +164,8 @@ def run_server() -> int:
         os.chdir(ROOT)
         sys.path.insert(0, str(ROOT))
         load_dotenv(ROOT / ".env", override=False)
+        from scripts.dev_config import load_config
+        load_config()
         os.environ["FLASK_ENV"] = "development"
         os.environ["DATABASE_PATH"] = str(STATE_DIR / "recipes.db")
         os.environ.setdefault("AUTH_ENABLED", "false")

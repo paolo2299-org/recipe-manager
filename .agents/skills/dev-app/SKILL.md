@@ -51,8 +51,9 @@ setup yourself; the user should not need to specify commands, ports or paths.
 ## Project details
 
 Recipe Manager always uses this worktree's `.dev/recipes.db`. Do not copy a
-production database or `.env`; without a development `.env`, auth is disabled
-and extraction requiring Anthropic credentials is unavailable.
+production database or `.env`. Authentication is disabled unless configured.
+AI features need an Anthropic key from the inherited environment, local .env,
+or private host config; a missing local .env alone does not mean the key is absent.
 
 Do not copy production `.env` files or credentials.
 Use the allocated loopback/Tailscale address. Ordinary previews do not need
@@ -89,3 +90,12 @@ For a manually or app-created worktree the helper does not manage, stop only
 the identified server and report that its worktree is retained. Do not adopt or
 remove it automatically. Report the removed environment and retained branch
 after successful cleanup. A turn ending alone is never a cleanup signal.
+
+## Private development settings
+
+Native startup automatically loads this project's private host config described
+in `docs/local-development.md`. Use `make dev-config` to check configured names
+without revealing values; do not cat/print the config or copy it into worktrees.
+Missing optional credentials should be reported only for the features that need
+them. Do not read production secrets or make paid API calls merely to preview.
+A particular key may already have been provisioned with the user's permission.
