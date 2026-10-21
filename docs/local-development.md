@@ -224,6 +224,5 @@ app/
 tests/                     # Pytest suite
 compose.yml                # Base production Compose settings
 compose.prod.yml           # Self-hosted VM overrides
-railway.toml               # Railway build/deploy config
 docs/                      # Additional guides
 ```

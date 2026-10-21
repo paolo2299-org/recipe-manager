@@ -6,9 +6,6 @@ optional GitHub Actions pipeline that builds and publishes an image on every pus
 to `main`. The VM pulls published images independently; GitHub Actions does not
 connect to it.
 
-If you just want the app running with the least possible effort, use the one-click
-[Railway deployment](../README.md) instead — you don't need any of this.
-
 ## Prerequisites
 
 - Docker and the Docker Compose plugin (`docker compose`)

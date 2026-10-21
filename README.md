@@ -2,17 +2,10 @@
 
 An AI-powered web app for saving and managing all of your recipes in one place, with zero effort.
 
-## Deploy on Railway
+## Deployment
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.com/deploy/kqrBFL)
-
-1. Get an [Anthropic API key](https://console.anthropic.com/)
-2. Click the button above
-3. Paste your API key and choose a password when prompted. Click deploy
-
-Railway gives you a URL when it's done — open it, log in, and start adding recipes.
-
-Cost: **free** on Railway's free tier, plus a few cents per recipe extraction billed to your Anthropic account.
+Deploy on your own server using Docker Compose and Caddy. Follow the
+[self-hosting guide](docs/self-hosting.md) for setup, configuration, and updates.
 
 ## More documentation
 
@@ -29,7 +22,6 @@ Cost: **free** on Railway's free tier, plus a few cents per recipe extraction bi
 - [Local development](docs/local-development.md) — running the app locally, make commands, and tests
 - [Configuration reference](docs/configuration.md) — all environment variables and database settings
 - [Self-hosting on your own server](docs/self-hosting.md) — Docker Compose + Caddy setup on a VM
-- [Publishing the Railway template](docs/railway-template.md) — maintainer notes for the one-click deploy button
 
 Private native-development settings can be shared across worktrees without
 committing secrets: see [private development configuration](docs/local-development.md#private-configuration-shared-by-worktrees).

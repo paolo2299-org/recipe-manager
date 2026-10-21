@@ -18,4 +18,4 @@ There is no multi-user support or external identity provider.
 
 The schema is created automatically on startup. Native development stores
 recipes in each worktree's ignored `.dev/recipes.db`. Production containers use
-`/app/data/recipes.db`, backed by a persistent host directory or Railway volume.
+`/app/data/recipes.db`, backed by a persistent host directory.
