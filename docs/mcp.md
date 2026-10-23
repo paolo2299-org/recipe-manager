@@ -36,13 +36,24 @@ Claude Code (also used by the Code tab of the Claude desktop app):
 claude mcp add --transport http --scope user recipes https://recipes.example.com/mcp --header "Authorization: Bearer $RECIPES_MCP_TOKEN"
 ```
 
-Codex, in `~/.codex/config.toml`:
+Codex, in `~/.codex/config.toml`. The Codex CLI, IDE extension and desktop app
+all read this file:
 
 ```toml
 [mcp_servers.recipes]
 url = "https://recipes.example.com/mcp"
 bearer_token_env_var = "RECIPES_MCP_TOKEN"
 ```
+
+`bearer_token_env_var` takes the variable's name, not the token. The desktop
+app reads the variable from its own environment, and macOS apps opened from the
+Dock usually don't see variables exported in `~/.zshrc`. If the desktop app
+gets 401s while the CLI works, do one of these:
+
+- Run `launchctl setenv RECIPES_MCP_TOKEN <token>`. This has to be repeated
+  after each reboot.
+- Use `http_headers = { Authorization = "Bearer <token>" }` instead. This
+  stores the token in plain text in the config file.
 
 Claude Desktop chat cannot attach a fixed header to a custom connector, so use
 the `mcp-remote` bridge in `claude_desktop_config.json` instead:
@@ -61,7 +72,8 @@ the `mcp-remote` bridge in `claude_desktop_config.json` instead:
 ```
 
 claude.ai, the Claude mobile apps and ChatGPT connectors require OAuth and are
-not supported by this endpoint.
+not supported by this endpoint. See [MCP authentication](mcp-oauth.md) for why,
+and for the plan to add OAuth (with Authlib) if that changes.
 
 ## Protocol notes
 
