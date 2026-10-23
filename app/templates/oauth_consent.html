@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Allow Access - Recipe Manager{% endblock %}
+{% block content %}
+<section class="auth-shell">
+    <article class="auth-card">
+        <h1>Allow access?</h1>
+        <p>
+            An app calling itself <strong>{{ client.client_name or "an unnamed app" }}</strong>
+            wants to <strong>read your recipes</strong> through MCP.
+        </p>
+        <p>After you approve, it will be sent back to <code>{{ redirect_host }}</code>.
+            Only approve if you just started connecting this app yourself.</p>
+
+        <form method="post" action="{{ url_for('oauth.authorize') }}">
+            {% for name, value in params.items() %}
+            <input type="hidden" name="{{ name }}" value="{{ value }}">
+            {% endfor %}
+            <input type="hidden" name="response_type" value="code">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" name="decision" value="approve">Allow</button>
+            <button type="submit" name="decision" value="deny" class="secondary">Deny</button>
+        </form>
+    </article>
+</section>
+{% endblock %}

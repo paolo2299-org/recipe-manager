@@ -8,11 +8,14 @@
 | `SECRET_KEY` | yes in production | must be a non-default value when `FLASK_ENV=production` |
 | `AUTH_ENABLED` | no (default `true`) | when true, the app requires login |
 | `AUTH_USERNAME` / `AUTH_PASSWORD` | yes if auth is enabled | the single login account |
+| `MCP_ENABLED` | no (default `false`) | enables the `/mcp` endpoint and its OAuth server; needs `AUTH_ENABLED` in production (see [MCP server](mcp.md)) |
 | `FLASK_ENV` | no | `development` (default) or `production` |
 | `DATABASE_PATH` | no | SQLite file path; native `make dev` forces `.dev/recipes.db`, while the container defaults to `/app/data/recipes.db` |
 
 Authentication is a single username/password (set via `AUTH_USERNAME` / `AUTH_PASSWORD`).
-There is no multi-user support or external identity provider.
+There is no multi-user support or external identity provider. When MCP is enabled,
+the app also acts as an OAuth server for MCP clients; you approve each client while
+signed in.
 
 ## Database
 

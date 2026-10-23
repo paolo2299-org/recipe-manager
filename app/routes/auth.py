@@ -16,7 +16,20 @@ from flask import (
 
 bp = Blueprint("auth", __name__)
 
-EXEMPT_ENDPOINTS = {"auth.login", "static", "recipes.health"}
+# MCP clients authenticate with OAuth access tokens, not the login session.
+# The OAuth authorize and connected-apps pages still require a signed-in user.
+EXEMPT_ENDPOINTS = {
+    "auth.login",
+    "static",
+    "recipes.health",
+    "mcp.endpoint",
+    "mcp.not_allowed",
+    "oauth.protected_resource_metadata",
+    "oauth.authorization_server_metadata",
+    "oauth.register",
+    "oauth.token",
+    "oauth.revoke",
+}
 
 
 def auth_enabled():

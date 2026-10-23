@@ -36,6 +36,15 @@ def validate_auth_config(app: Flask) -> None:
         )
 
 
+def validate_mcp_config(app: Flask) -> None:
+    if app.config.get("TESTING") or not app.config.get("IS_PRODUCTION"):
+        return
+
+    # The OAuth consent page relies on the login to know who is approving.
+    if app.config.get("MCP_ENABLED") and not app.config.get("AUTH_ENABLED"):
+        raise RuntimeError("MCP_ENABLED requires AUTH_ENABLED in production.")
+
+
 def create_app(test_config: dict[str, object] | None = None) -> Flask:
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)  # type: ignore[method-assign]
@@ -51,13 +60,18 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
 
     validate_secret_key_config(app)
     validate_auth_config(app)
+    validate_mcp_config(app)
 
     from app.storage.db import init_db
     init_db(app)
 
     from app.routes.auth import bp as auth_bp
+    from app.routes.mcp import bp as mcp_bp
+    from app.routes.oauth import bp as oauth_bp
     from app.routes.recipes import bp
     app.register_blueprint(auth_bp)
+    app.register_blueprint(oauth_bp)
+    app.register_blueprint(mcp_bp)
     app.register_blueprint(bp)
 
     return app

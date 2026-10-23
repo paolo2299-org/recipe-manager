@@ -19,6 +19,13 @@ class Config:
     }
     AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "")
     AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "")
+    # Enables the /mcp endpoint and the OAuth server MCP clients sign in with.
+    MCP_ENABLED = os.environ.get("MCP_ENABLED", "false").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 class DevelopmentConfig(Config):
