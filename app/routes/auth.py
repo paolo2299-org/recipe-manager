@@ -16,7 +16,8 @@ from flask import (
 
 bp = Blueprint("auth", __name__)
 
-EXEMPT_ENDPOINTS = {"auth.login", "static", "recipes.health"}
+# MCP clients authenticate with their own bearer token, not the login session.
+EXEMPT_ENDPOINTS = {"auth.login", "static", "recipes.health", "mcp.endpoint", "mcp.not_allowed"}
 
 
 def auth_enabled():

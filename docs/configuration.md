@@ -8,6 +8,7 @@
 | `SECRET_KEY` | yes in production | must be a non-default value when `FLASK_ENV=production` |
 | `AUTH_ENABLED` | no (default `true`) | when true, the app requires login |
 | `AUTH_USERNAME` / `AUTH_PASSWORD` | yes if auth is enabled | the single login account |
+| `MCP_TOKEN` | no | enables the `/mcp` endpoint; at least 32 characters (see [MCP server](mcp.md)) |
 | `FLASK_ENV` | no | `development` (default) or `production` |
 | `DATABASE_PATH` | no | SQLite file path; native `make dev` forces `.dev/recipes.db`, while the container defaults to `/app/data/recipes.db` |
 

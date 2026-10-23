@@ -19,6 +19,8 @@ class Config:
     }
     AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "")
     AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "")
+    # Bearer token for the /mcp endpoint; the endpoint is disabled when unset.
+    MCP_TOKEN = os.environ.get("MCP_TOKEN", "")
 
 
 class DevelopmentConfig(Config):
