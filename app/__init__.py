@@ -36,6 +36,20 @@ def validate_auth_config(app: Flask) -> None:
         )
 
 
+MIN_MCP_TOKEN_LENGTH = 32
+
+
+def validate_mcp_config(app: Flask) -> None:
+    if app.config.get("TESTING"):
+        return
+
+    token = app.config.get("MCP_TOKEN", "")
+    if token and len(token) < MIN_MCP_TOKEN_LENGTH:
+        raise RuntimeError(
+            f"MCP_TOKEN must be at least {MIN_MCP_TOKEN_LENGTH} characters."
+        )
+
+
 def create_app(test_config: dict[str, object] | None = None) -> Flask:
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)  # type: ignore[method-assign]
@@ -51,13 +65,16 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
 
     validate_secret_key_config(app)
     validate_auth_config(app)
+    validate_mcp_config(app)
 
     from app.storage.db import init_db
     init_db(app)
 
     from app.routes.auth import bp as auth_bp
+    from app.routes.mcp import bp as mcp_bp
     from app.routes.recipes import bp
     app.register_blueprint(auth_bp)
+    app.register_blueprint(mcp_bp)
     app.register_blueprint(bp)
 
     return app

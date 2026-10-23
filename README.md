@@ -22,6 +22,7 @@ Deploy on your own server using Docker Compose and Caddy. Follow the
 - [Local development](docs/local-development.md) — running the app locally, make commands, and tests
 - [Configuration reference](docs/configuration.md) — all environment variables and database settings
 - [Self-hosting on your own server](docs/self-hosting.md) — Docker Compose + Caddy setup on a VM
+- [MCP server](docs/mcp.md) — connecting Claude Code, Claude Desktop and Codex to your recipes
 
 Private native-development settings can be shared across worktrees without
 committing secrets: see [private development configuration](docs/local-development.md#private-configuration-shared-by-worktrees).
