@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Connected Apps - Recipe Manager{% endblock %}
+{% block content %}
+<h1>Connected apps</h1>
+<p>Apps you have allowed to read your recipes through MCP. Disconnecting an app
+    stops it immediately; it will need your approval to connect again.</p>
+
+{% if grants %}
+<table>
+    <thead>
+        <tr><th>App</th><th>Connected</th><th>Last used</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for grant in grants %}
+        <tr>
+            <td>{{ grant.client_name or "Unnamed app" }}</td>
+            <td>{{ grant.created_at | timestamp }}</td>
+            <td>{{ grant.last_used_at | timestamp if grant.last_used_at else "Never" }}</td>
+            <td>
+                <form method="post" action="{{ url_for('oauth.revoke_grant', grant_id=grant.id) }}" class="inline-form">
+                    <button type="submit" class="secondary">Disconnect</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No apps are connected.</em></p>
+{% endif %}
+{% endblock %}

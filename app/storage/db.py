@@ -40,6 +40,39 @@ CREATE TABLE IF NOT EXISTS calories (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_calories_lookup ON calories(name_key, unit_key);
+
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    client_id          TEXT PRIMARY KEY,
+    client_secret_hash TEXT,
+    client_name        TEXT,
+    redirect_uris      TEXT    NOT NULL,
+    auth_method        TEXT    NOT NULL,
+    created_at         INTEGER NOT NULL,
+    approved_at        INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS oauth_codes (
+    code_hash             TEXT PRIMARY KEY,
+    client_id             TEXT    NOT NULL REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+    redirect_uri          TEXT    NOT NULL,
+    code_challenge        TEXT    NOT NULL,
+    code_challenge_method TEXT    NOT NULL,
+    scope                 TEXT    NOT NULL,
+    expires_at            INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS oauth_tokens (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id          TEXT    NOT NULL REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+    access_hash        TEXT    NOT NULL UNIQUE,
+    access_expires_at  INTEGER NOT NULL,
+    refresh_hash       TEXT    NOT NULL UNIQUE,
+    refresh_expires_at INTEGER NOT NULL,
+    scope              TEXT    NOT NULL,
+    resource           TEXT    NOT NULL,
+    created_at         INTEGER NOT NULL,
+    last_used_at       INTEGER
+);
 """
 
 
